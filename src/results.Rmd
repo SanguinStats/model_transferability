@@ -1,7 +1,7 @@
 ---
 title: "Model transferability"
-author: "Jarkko Toivonen"
-date: "2023-01-17"
+author: "Amber Meulenbeld"
+date: "2023-01-31"
 output: html_document
 ---
 
@@ -16,45 +16,56 @@ library(tidyverse)
 ```
 
 ```{r}
-base <- "~/FRCBS/Hb_predictor_container/results/"
-results_path <- "~/FRCBS/model_transferability/results"
-fig_path <- file.path(results_path, "figures")
-model1_path <- sprintf("%s/jarkko-2023-01-17-model1-l-2", base)
-model2_path <- sprintf("%s/jarkko-2023-01-17-model2-l-5", base)
-model3_path <- sprintf("%s/jarkko-2023-01-17-model3-l-5-hb4", base)
+NL <- "C:/Users/meule01a/OneDrive - Sanquin/A4 Project SanguinStats (OD)/07 Resultaten/20230130 Test minimum donations"
+model1_path_NL <- sprintf("%s/Model1", NL)
+model2_path_NL <- sprintf("%s/Model2", NL)
+model3_path_NL <- sprintf("%s/Model3", NL)
+
+Fin <- "C:/Users/meule01a/OneDrive - Sanquin/A4 Project SanguinStats (OD)/07 Resultaten/20230131 Finnish trained models"
+model1_path_Fin <- sprintf("%s/Model1", Fin)
+model2_path_Fin <- sprintf("%s/Model2", Fin)
+model3_path_Fin <- sprintf("%s/Model3", Fin)
 ```
 
 ```{r}
-res1 <- read_csv(file.path(model1_path, "summary.csv")) %>% mutate(Id = "model1-l-2")
-res2 <- read_csv(file.path(model2_path, "summary.csv")) %>% mutate(Id = "model2-l-5")
-res3 <- read_csv(file.path(model3_path, "summary.csv")) %>% mutate(Id = "model3-l-5-hb4")
+res1_NL <- read_csv(file.path(model1_path_NL, "summary.csv")) %>% mutate(Id = "model1-l-2")
+res2_NL <- read_csv(file.path(model2_path_NL, "summary.csv")) %>% mutate(Id = "model2-l-5")
+res3_NL <- read_csv(file.path(model3_path_NL, "summary.csv")) %>% mutate(Id = "model3-l-5-hb4")
+
+res1_Fin <- read_csv(file.path(model1_path_Fin, "summary.csv")) %>% mutate(Id = "model1-l-2")
+res2_Fin <- read_csv(file.path(model2_path_Fin, "summary.csv")) %>% mutate(Id = "model2-l-5")
+res3_Fin <- read_csv(file.path(model3_path_Fin, "summary.csv")) %>% mutate(Id = "model3-l-5-hb4")
 ```
 
 ```{r}
-res <- bind_rows(res1, res2, res3)
+res_NL <- bind_rows(res1_NL, res2_NL, res3_NL)
+res_NL$Country <- "NL"
+res_Fin <- bind_rows(res1_Fin, res2_Fin, res3_Fin)
+res_Fin$Country <- "Fin"
+
+res <- bind_rows(res_NL, res_Fin)
+
+res$Id <- substr(res$Id, 1, 6)
 ```
 
 
 ```{r}
-df <- res %>% select(Id, Sex, matches("^F1|^AUROC|AUPR")) %>%
-  pivot_longer(-c(Id, Sex)) %>%
+df <- res %>% select(Id, Sex,Country, matches("^F1|^AUROC|AUPR")) %>%
+  pivot_longer(-c(Id, Sex,Country)) %>%
   separate(name, c("metric", "type"), sep=" ") %>%
   pivot_wider(names_from="type") 
-g <- df %>%
+df %>%
   mutate(Id = fct_rev(Id)) %>%
-  ggplot(aes(x=value, xmin=low, xmax=high, y=Id)) +
-  geom_pointrange() +
-  labs(title="Finland") +
+  ggplot(aes(x=value, xmin=low, xmax=high, y=Id, color = Country)) +
+  geom_pointrange(position = position_dodge(width= 0.6)) +
+  labs(title="Data from NL", color = "Model trained in") +
   #lims(x=c(0,1)) +                 # This drops the whole confidence interval if it is party outside limits
   coord_cartesian(xlim=c(0, 1)) +   # Unlike above, this only cuts the interval instead of dropping
   facet_grid(metric ~ Sex)
-g
-filename <- file.path(fig_path, "finland_summary.png")
-ggsave(filename, g)
+
+FileName <- paste(Fin, "/2trainedmodels.png",sep="")
+ggsave(FileName)
 ```
-
-
-
 
 
 
