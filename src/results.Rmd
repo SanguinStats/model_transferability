@@ -1,0 +1,88 @@
+---
+title: "Model transferability"
+author: "Jarkko Toivonen"
+date: "2023-01-17"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+```{r setup}
+library(tidyverse)
+```
+
+```{r}
+base <- "~/FRCBS/Hb_predictor_container/results/"
+results_path <- "~/FRCBS/model_transferability/results"
+fig_path <- file.path(results_path, "figures")
+model1_path <- sprintf("%s/jarkko-2023-01-17-model1-l-2", base)
+model2_path <- sprintf("%s/jarkko-2023-01-17-model2-l-5", base)
+model3_path <- sprintf("%s/jarkko-2023-01-17-model3-l-5-hb4", base)
+```
+
+```{r}
+res1 <- read_csv(file.path(model1_path, "summary.csv")) %>% mutate(Id = "model1-l-2")
+res2 <- read_csv(file.path(model2_path, "summary.csv")) %>% mutate(Id = "model2-l-5")
+res3 <- read_csv(file.path(model3_path, "summary.csv")) %>% mutate(Id = "model3-l-5-hb4")
+```
+
+```{r}
+res <- bind_rows(res1, res2, res3)
+```
+
+
+```{r}
+df <- res %>% select(Id, Sex, matches("^F1|^AUROC|AUPR")) %>%
+  pivot_longer(-c(Id, Sex)) %>%
+  separate(name, c("metric", "type"), sep=" ") %>%
+  pivot_wider(names_from="type") 
+g <- df %>%
+  mutate(Id = fct_rev(Id)) %>%
+  ggplot(aes(x=value, xmin=low, xmax=high, y=Id)) +
+  geom_pointrange() +
+  labs(title="Finland") +
+  #lims(x=c(0,1)) +                 # This drops the whole confidence interval if it is party outside limits
+  coord_cartesian(xlim=c(0, 1)) +   # Unlike above, this only cuts the interval instead of dropping
+  facet_grid(metric ~ Sex)
+g
+filename <- file.path(fig_path, "finland_summary.png")
+ggsave(filename, g)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
