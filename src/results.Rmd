@@ -1,7 +1,7 @@
 ---
 title: "Model transferability"
 author: "Amber Meulenbeld"
-date: "2023-01-31"
+date: "2023-02-16"
 output: html_document
 ---
 
@@ -13,7 +13,8 @@ load_files <- function(folder, target_name) {
   file <- paste0(path, folder, target_name)
   data <- read.csv(file) %>%
     mutate(model = info[1],
-           size = info[2])
+           modelcountry = info[2],
+           datacountry = info[3])
   return(data)
 }
 ```
@@ -24,169 +25,88 @@ load_files <- function(folder, target_name) {
 library(tidyverse)
 ```
 
-```{r Dutch model Dutch data}
-path <- "C:/Users/meule01a/OneDrive - Sanquin/A4 Project SanguinStats (OD)/07 Resultaten/20230130 Test minimum donations/"
+```{r load models and data}
+path <- "C:/Users/meule01a/OneDrive - Sanquin/A4 Project SanguinStats (OD)/07 Resultaten/20230301 SanguinStats results overview/results/"
 folders <- list.dirs(path, full.names=FALSE, recursive=FALSE)
 
 datalist <- lapply(folders, load_files, target_name='/sizes.csv')
-data_sizes_NL <- bind_rows(datalist) %>%
+data_sizes <- bind_rows(datalist) %>%
   separate(
       ï..Id, into=c(NA, 'sex'), sep='-') %>%
   distinct() %>%
   mutate(deferral_rate = Deferred.last.donations / Donors,
-         country = "NL") %>%
+         modelcountry = case_when(modelcountry=='BE' ~ 'Belgium',
+                             modelcountry=='NL' ~ 'Netherlands',
+                             modelcountry=='FI' ~ 'Finland',
+                             modelcountry=='SA' ~ 'South Africa',
+                             modelcountry=='AU' ~ 'Australia'),
+         datacountry = case_when(datacountry=='BE' ~ 'Belgium',
+                             datacountry=='NL' ~ 'Netherlands',
+                             datacountry=='FI' ~ 'Finland',
+                             datacountry=='SA' ~ 'South Africa',
+                             datacountry=='AU' ~ 'Australia')) %>%
   #rename("ï..Id" = "Id") %>%
-  select(model, country, sex, label, deferral_rate) %>%
+  select(model, datacountry, modelcountry, sex, label, deferral_rate) %>%
   pivot_wider(names_from=label, names_prefix='defrate_', values_from=deferral_rate)
 
 datalist <- lapply(folders, load_files, target_name='/summary.csv')
-data_NL <- bind_rows(datalist) %>%
-  select(Pretty, Sex, AUPR.value, AUPR.low, AUPR.high, AUROC.value, AUROC.low, AUROC.high, F1.value, F1.low, F1.high,model) %>%
+data <- bind_rows(datalist) %>%
+  select(modelcountry, datacountry, Sex, AUPR.value, AUPR.low, AUPR.high, AUROC.value, AUROC.low, AUROC.high, F1.value, F1.low, F1.high,model) %>%
   rename("sex"="Sex")%>%
-  mutate(country = "NL")%>%
-  select(-Pretty)%>%
+  mutate(modelcountry = case_when(modelcountry=='BE' ~ 'Belgium',
+                             modelcountry=='NL' ~ 'Netherlands',
+                             modelcountry=='FI' ~ 'Finland',
+                             modelcountry=='SA' ~ 'South Africa',
+                             modelcountry=='AU' ~ 'Australia'),
+         datacountry = case_when(datacountry=='BE' ~ 'Belgium',
+                             datacountry=='NL' ~ 'Netherlands',
+                             datacountry=='FI' ~ 'Finland',
+                             datacountry=='SA' ~ 'South Africa',
+                             datacountry=='AU' ~ 'Australia')) %>%
          #sex = as.factor(Sex)) %>%
-  merge(data_sizes_NL, by=c('model', 'sex', 'country'), all.x=TRUE) %>%
+  merge(data_sizes, by=c('model', 'sex', 'datacountry', 'modelcountry'), all.x=TRUE) %>%
   mutate(AUPR.value = (AUPR.value - defrate_validate),
-         AUPR.low   = AUPR.low   - defrate_validate,
+         AUPR.low   = AUPR.low - defrate_validate,
          AUPR.high  = AUPR.high  - defrate_validate)%>%
   select(-defrate_train, -defrate_test)%>%
   rename("AUPR value"="AUPR.value","AUPR low"="AUPR.low","AUPR high"="AUPR.high","AUROC value"="AUROC.value","AUROC low"= "AUROC.low","AUROC high"="AUROC.high","F1 value"="F1.value","F1 low"="F1.low","F1 high"="F1.high")
 ```
 
-```{r Finnish model Dutch data}
-path <- "C:/Users/meule01a/OneDrive - Sanquin/A4 Project SanguinStats (OD)/07 Resultaten/20230131 Finnish trained models/"
-folders <- list.dirs(path, full.names=FALSE, recursive=FALSE)
 
-datalist <- lapply(folders, load_files, target_name='/sizes.csv')
-data_sizes_FI <- bind_rows(datalist) %>%
-  separate(
-      ï..Id, into=c(NA, 'sex'), sep='-') %>%
-  distinct() %>%
-  mutate(deferral_rate = Deferred.last.donations / Donors,
-         country = "FI") %>%
-  #rename("ï..Id" = "Id") %>%
-  select(model, country, sex, label, deferral_rate) %>%
-  pivot_wider(names_from=label, names_prefix='defrate_', values_from=deferral_rate)
 
-datalist <- lapply(folders, load_files, target_name='/summary.csv')
-data_FI <- bind_rows(datalist) %>%
-  select(Pretty, Sex, AUPR.value, AUPR.low, AUPR.high, AUROC.value, AUROC.low, AUROC.high, F1.value, F1.low, F1.high,model) %>%
-  rename("sex"="Sex")%>%
-  mutate(country = "FI")%>%
-  select(-Pretty)%>%
-         #sex = as.factor(Sex)) %>%
-  merge(data_sizes_FI, by=c('model', 'sex', 'country'), all.x=TRUE) %>%
-  mutate(AUPR.value = (AUPR.value - defrate_validate),
-         AUPR.low   = AUPR.low   - defrate_validate,
-         AUPR.high  = AUPR.high  - defrate_validate)%>%
-  select(-defrate_train, -defrate_test)%>%
-  rename("AUPR value"="AUPR.value","AUPR low"="AUPR.low","AUPR high"="AUPR.high","AUROC value"="AUROC.value","AUROC low"= "AUROC.low","AUROC high"="AUROC.high","F1 value"="F1.value","F1 low"="F1.low","F1 high"="F1.high")
+```{r make figures}
+currentDate <- format(Sys.time(), "%Y-%m-%d")
+FolderName <- paste("C:/Users/meule01a/OneDrive - Sanquin/A4 Project SanguinStats (OD)/07 Resultaten/20230301 SanguinStats results overview/figures/", currentDate,sep="")
+dir.create(FolderName)
 
-data_Total <- bind_rows(data_NL, data_FI)
-``` 
+countries <- c("Netherlands","Finland","South Africa","Australia", "Belgium")
+countries <- c("Netherlands","Finland") #selected only finland and NL because we only ran models on these data
 
-```{r figure NL data}
-df <- data_Total %>% select(model, sex,country, matches("^F1|^AUROC|AUPR")) %>%
-  pivot_longer(-c(model, sex,country)) %>%
+df <- data %>% select(model, sex,datacountry,modelcountry, matches("^F1|^AUROC|AUPR")) %>%
+  pivot_longer(-c(model, sex,datacountry,modelcountry)) %>%
   separate(name, c("metric", "type"), sep=" ") %>%
-  pivot_wider(names_from="type") 
-df %>%
+  pivot_wider(names_from="type")
+
+for (i in 1:length(countries)){
+  df %>%
+  subset(df$datacountry == countries[i])%>%
   mutate(Id = fct_rev(model)) %>%
-  ggplot(aes(x=value, xmin=low, xmax=high, y=Id, color = country)) +
+  ggplot(aes(x=value, 
+             xmin=low, 
+             xmax=high, 
+             y=Id, 
+             #shape = datacountry, 
+             color = modelcountry)) +
   geom_pointrange(position = position_dodge(width= 0.6)) +
-  labs(title="Data from NL", color = "Model trained in") +
+  labs(title=paste0("Data from ", countries[i], sep=""),  
+       #shape = "Data from",
+       color = "Model trained in") +
   #lims(x=c(0,1)) +                 # This drops the whole confidence interval if it is party outside limits
   coord_cartesian(xlim=c(0, 1)) +   # Unlike above, this only cuts the interval instead of dropping
   facet_grid(metric ~ sex)
 
-currentDate <- format(Sys.time(), "%Y-%m-%d")
-FolderName <- paste("C:/Users/meule01a/OneDrive - Sanquin/A4 Project SanguinStats (OD)/07 Resultaten/Model comparison/", currentDate,sep="")
-dir.create(FolderName)
-
-FileName <- paste(FolderName, "/DataNLModelNLFI.png",sep="")
+FileName <- paste(FolderName, "/Modelperformance_Data", countries[i] ,".png",sep="")
 ggsave(FileName)
-```
-```{r Dutch model Finnish data}
-path <- "C:/Users/meule01a/OneDrive - Sanquin/A4 Project SanguinStats (OD)/07 Resultaten/20230131 Dutch trained models Finnish data/"
-folders <- list.dirs(path, full.names=FALSE, recursive=FALSE)
+}
 
-datalist <- lapply(folders, load_files, target_name='/sizes.csv')
-data_sizes_NL <- bind_rows(datalist) %>%
-  separate(
-      ï..Id, into=c(NA, 'sex'), sep='-') %>%
-  distinct() %>%
-  mutate(deferral_rate = Deferred.last.donations / Donors,
-         country = "NL") %>%
-  #rename("ï..Id" = "Id") %>%
-  select(model, country, sex, label, deferral_rate) %>%
-  pivot_wider(names_from=label, names_prefix='defrate_', values_from=deferral_rate)
-
-datalist <- lapply(folders, load_files, target_name='/summary.csv')
-data_NL <- bind_rows(datalist) %>%
-  select(Pretty, Sex, AUPR.value, AUPR.low, AUPR.high, AUROC.value, AUROC.low, AUROC.high, F1.value, F1.low, F1.high,model) %>%
-  rename("sex"="Sex")%>%
-  mutate(country = "NL")%>%
-  select(-Pretty)%>%
-         #sex = as.factor(Sex)) %>%
-  merge(data_sizes_NL, by=c('model', 'sex', 'country'), all.x=TRUE) %>%
-  mutate(AUPR.value = (AUPR.value - defrate_validate),
-         AUPR.low   = AUPR.low   - defrate_validate,
-         AUPR.high  = AUPR.high  - defrate_validate)%>%
-  select(-defrate_train, -defrate_test)%>%
-  rename("AUPR value"="AUPR.value","AUPR low"="AUPR.low","AUPR high"="AUPR.high","AUROC value"="AUROC.value","AUROC low"= "AUROC.low","AUROC high"="AUROC.high","F1 value"="F1.value","F1 low"="F1.low","F1 high"="F1.high")
-```
-
-```{r Finnish model Finnish data}
-path <- "C:/Users/meule01a/OneDrive - Sanquin/A4 Project SanguinStats (OD)/07 Resultaten/20230117 Test minimum donations FI/"
-folders <- list.dirs(path, full.names=FALSE, recursive=FALSE)
-
-datalist <- lapply(folders, load_files, target_name='/sizes.csv')
-data_sizes_FI <- bind_rows(datalist) %>%
-  separate(
-      ï..Id, into=c(NA, 'sex'), sep='-') %>%
-  distinct() %>%
-  mutate(deferral_rate = Deferred.last.donations / Donors,
-         country = "FI") %>%
-  #rename("ï..Id" = "Id") %>%
-  select(model, country, sex, label, deferral_rate) %>%
-  pivot_wider(names_from=label, names_prefix='defrate_', values_from=deferral_rate)
-
-datalist <- lapply(folders, load_files, target_name='/summary.csv')
-data_FI <- bind_rows(datalist) %>%
-  select(Pretty, Sex, AUPR.value, AUPR.low, AUPR.high, AUROC.value, AUROC.low, AUROC.high, F1.value, F1.low, F1.high,model) %>%
-  rename("sex"="Sex")%>%
-  mutate(country = "FI")%>%
-  select(-Pretty)%>%
-         #sex = as.factor(Sex)) %>%
-  merge(data_sizes_FI, by=c('model', 'sex', 'country'), all.x=TRUE) %>%
-  mutate(AUPR.value = (AUPR.value - defrate_validate),
-         AUPR.low   = AUPR.low   - defrate_validate,
-         AUPR.high  = AUPR.high  - defrate_validate)%>%
-  select(-defrate_train, -defrate_test)%>%
-  rename("AUPR value"="AUPR.value","AUPR low"="AUPR.low","AUPR high"="AUPR.high","AUROC value"="AUROC.value","AUROC low"= "AUROC.low","AUROC high"="AUROC.high","F1 value"="F1.value","F1 low"="F1.low","F1 high"="F1.high")
-
-data_Total <- bind_rows(data_NL, data_FI)
-``` 
-
-```{r figure FI data}
-df <- data_Total %>% select(model, sex,country, matches("^F1|^AUROC|AUPR")) %>%
-  pivot_longer(-c(model, sex,country)) %>%
-  separate(name, c("metric", "type"), sep=" ") %>%
-  pivot_wider(names_from="type") 
-df %>%
-  mutate(Id = fct_rev(model)) %>%
-  ggplot(aes(x=value, xmin=low, xmax=high, y=Id, color = country)) +
-  geom_pointrange(position = position_dodge(width= 0.6)) +
-  labs(title="Data from FI", color = "Model trained in") +
-  #lims(x=c(0,1)) +                 # This drops the whole confidence interval if it is party outside limits
-  coord_cartesian(xlim=c(0, 1)) +   # Unlike above, this only cuts the interval instead of dropping
-  facet_grid(metric ~ sex)
-
-currentDate <- format(Sys.time(), "%Y-%m-%d")
-FolderName <- paste("C:/Users/meule01a/OneDrive - Sanquin/A4 Project SanguinStats (OD)/07 Resultaten/Model comparison/", currentDate,sep="")
-dir.create(FolderName)
-
-FileName <- paste(FolderName, "/DataFIModelNLFI.png",sep="")
-ggsave(FileName)
 ```
