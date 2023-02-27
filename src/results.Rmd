@@ -30,9 +30,14 @@ path <- "C:/Users/meule01a/OneDrive - Sanquin/A4 Project SanguinStats (OD)/07 Re
 folders <- list.dirs(path, full.names=FALSE, recursive=FALSE)
 
 datalist <- lapply(folders, load_files, target_name='/sizes.csv')
+
+for(i in 1:length(datalist)){
+  colnames(datalist[[i]])[1] <- "Id"
+}
+
 data_sizes <- bind_rows(datalist) %>%
   separate(
-      ï..Id, into=c(NA, 'sex'), sep='-') %>%
+      Id, into=c(NA, 'sex'), sep='-') %>%
   distinct() %>%
   mutate(deferral_rate = Deferred.last.donations / Donors,
          modelcountry = case_when(modelcountry=='BE' ~ 'Belgium',
@@ -45,7 +50,7 @@ data_sizes <- bind_rows(datalist) %>%
                              datacountry=='FI' ~ 'Finland',
                              datacountry=='SA' ~ 'South Africa',
                              datacountry=='AU' ~ 'Australia')) %>%
-  #rename("ï..Id" = "Id") %>%
+  
   select(model, datacountry, modelcountry, sex, label, deferral_rate) %>%
   pivot_wider(names_from=label, names_prefix='defrate_', values_from=deferral_rate)
 
@@ -80,7 +85,7 @@ FolderName <- paste("C:/Users/meule01a/OneDrive - Sanquin/A4 Project SanguinStat
 dir.create(FolderName)
 
 countries <- c("Netherlands","Finland","South Africa","Australia", "Belgium")
-countries <- c("Netherlands","Finland") #selected only finland and NL because we only ran models on these data
+countries <- c("Netherlands","Finland","South Africa","Australia") #selected only finland and NL because we only ran models on these data
 
 df <- data %>% select(model, sex,datacountry,modelcountry, matches("^F1|^AUROC|AUPR")) %>%
   pivot_longer(-c(model, sex,datacountry,modelcountry)) %>%
@@ -110,3 +115,4 @@ ggsave(FileName)
 }
 
 ```
+
