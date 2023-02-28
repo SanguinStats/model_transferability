@@ -1,0 +1,117 @@
+---
+title: "Model transferability (AUPR)"
+author: "A. Meulenbeld"
+date: "28-2-2023"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+load_files <- function(folder, target_name) {
+  info <- str_split(folder, '-', simplify=TRUE)       # country, size
+  file <- paste0(path, folder, target_name)
+  data <- read.csv(file) %>%
+    mutate(model = info[1],
+           modelcountry = info[2],
+           datacountry = info[3])
+  return(data)
+}
+```
+
+## R Markdown
+
+```{r setup}
+library(tidyverse)
+```
+
+```{r load models and data}
+path <- "C:/Users/meule01a/OneDrive - Sanquin/A4 Project SanguinStats (OD)/07 Resultaten/20230301 SanguinStats results overview/results/"
+folders <- list.dirs(path, full.names=FALSE, recursive=FALSE)
+
+datalist <- lapply(folders, load_files, target_name='/sizes.csv')
+
+for(i in 1:length(datalist)){
+  colnames(datalist[[i]])[1] <- "Id"
+}
+
+data_sizes <- bind_rows(datalist) %>%
+  separate(
+      Id, into=c(NA, 'sex'), sep='-') %>%
+  distinct() %>%
+  mutate(deferral_rate = Deferred.last.donations / Donors,
+         modelcountry = case_when(modelcountry=='BE' ~ 'Belgium',
+                             modelcountry=='NL' ~ 'Netherlands',
+                             modelcountry=='FI' ~ 'Finland',
+                             modelcountry=='SA' ~ 'South Africa',
+                             modelcountry=='AU' ~ 'Australia'),
+         datacountry = case_when(datacountry=='BE' ~ 'Belgium',
+                             datacountry=='NL' ~ 'Netherlands',
+                             datacountry=='FI' ~ 'Finland',
+                             datacountry=='SA' ~ 'South Africa',
+                             datacountry=='AU' ~ 'Australia')) %>%
+  
+  select(model, datacountry, modelcountry, sex, label, deferral_rate) %>%
+  pivot_wider(names_from=label, names_prefix='defrate_', values_from=deferral_rate)
+
+datalist <- lapply(folders, load_files, target_name='/summary.csv')
+data <- bind_rows(datalist) %>%
+  select(modelcountry, datacountry, Sex, AUPR.value, AUPR.low, AUPR.high, model) %>%
+  rename("sex"="Sex")%>%
+  mutate(modelcountry = case_when(modelcountry=='BE' ~ 'Belgium',
+                             modelcountry=='NL' ~ 'Netherlands',
+                             modelcountry=='FI' ~ 'Finland',
+                             modelcountry=='SA' ~ 'South Africa',
+                             modelcountry=='AU' ~ 'Australia'),
+         datacountry = case_when(datacountry=='BE' ~ 'Belgium',
+                             datacountry=='NL' ~ 'Netherlands',
+                             datacountry=='FI' ~ 'Finland',
+                             datacountry=='SA' ~ 'South Africa',
+                             datacountry=='AU' ~ 'Australia')) %>%
+         #sex = as.factor(Sex)) %>%
+  merge(data_sizes, by=c('model', 'sex', 'datacountry', 'modelcountry'), all.x=TRUE) %>%
+  mutate(AUPR.value = (AUPR.value - defrate_validate),
+         AUPR.low   = AUPR.low - defrate_validate,
+         AUPR.high  = AUPR.high  - defrate_validate)%>%
+  select(-defrate_train, -defrate_test)%>%
+  rename("AUPR value"="AUPR.value","AUPR low"="AUPR.low","AUPR high"="AUPR.high")
+```
+
+
+
+```{r make figures}
+currentDate <- format(Sys.time(), "%Y-%m-%d")
+FolderName <- paste("C:/Users/meule01a/OneDrive - Sanquin/A4 Project SanguinStats (OD)/07 Resultaten/20230301 SanguinStats results overview/figures/", currentDate,sep="")
+dir.create(FolderName)
+
+countries <- c("Netherlands","Finland","South Africa","Australia", "Belgium")
+countries <- c("Netherlands","Finland","South Africa","Australia") #selected only finland and NL because we only ran models on these data
+
+df <- data %>% select(model, sex,datacountry,modelcountry, matches("AUPR")) %>%
+  pivot_longer(-c(model, sex,datacountry,modelcountry)) %>%
+  separate(name, c("metric", "type"), sep=" ") %>%
+  pivot_wider(names_from="type")
+
+for (i in 1:length(countries)){
+  df %>%
+  subset(df$datacountry == countries[i])%>%
+  mutate(Id = fct_rev(model)) %>%
+  ggplot(aes(x=value, 
+             xmin=low, 
+             xmax=high, 
+             y=Id, 
+             #shape = datacountry, 
+             color = modelcountry)) +
+  geom_pointrange(position = position_dodge(width= 0.6)) +
+  labs(title=paste0("Data from ", countries[i], sep=""),  
+       #shape = "Data from",
+       color = "Model trained in") +
+  #lims(x=c(0,1)) +                 # This drops the whole confidence interval if it is party outside limits
+  coord_cartesian(xlim=c(0, 1)) +   # Unlike above, this only cuts the interval instead of dropping
+  facet_grid(cols = vars(sex)) + xlab("AUPR")
+
+FileName <- paste(FolderName, "/Modelperformance_AUPR_Data", countries[i] ,".png",sep="")
+ggsave(FileName, width = 7, height = 4)
+}
+
+```
