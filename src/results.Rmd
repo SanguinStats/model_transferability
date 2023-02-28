@@ -102,6 +102,8 @@ for (i in 1:length(countries)){
              y=Id, 
              #shape = datacountry, 
              color = modelcountry)) +
+  
+  guides(color = guide_legend(reverse = TRUE))+ #reverses the order of the legend, because apparently it is not displayed in the same order as the countries in the plot
   geom_pointrange(position = position_dodge(width= 0.6)) +
   labs(title=paste0("Data from ", countries[i], sep=""),  
        #shape = "Data from",
