@@ -70,11 +70,11 @@ data <- bind_rows(datalist) %>%
                              datacountry=='AU' ~ 'Australia')) %>%
          #sex = as.factor(Sex)) %>%
   merge(data_sizes, by=c('model', 'sex', 'datacountry', 'modelcountry'), all.x=TRUE) %>%
-  mutate(AUPR.value = (AUPR.value - defrate_validate),
-         AUPR.low   = AUPR.low - defrate_validate,
-         AUPR.high  = AUPR.high  - defrate_validate)%>%
-  select(-defrate_train, -defrate_test)%>%
-  rename("AUPR value"="AUPR.value","AUPR low"="AUPR.low","AUPR high"="AUPR.high")
+  mutate(AUPRadj.value = (AUPR.value - defrate_validate),
+         AUPRadj.low   = AUPR.low - defrate_validate,
+         AUPRadj.high  = AUPR.high  - defrate_validate)%>%
+  select(-defrate_train, -defrate_test, -defrate_validate)%>%
+  rename("AUPR value"="AUPR.value","AUPR low"="AUPR.low","AUPR high"="AUPR.high","AUPRadj value"="AUPRadj.value","AUPRadj low"="AUPRadj.low","AUPRadj high"="AUPRadj.high")
 ```
 
 
@@ -87,7 +87,35 @@ dir.create(FolderName)
 countries <- c("Netherlands","Finland","South Africa","Australia", "Belgium")
 countries <- c("Netherlands","Finland","South Africa","Australia") #selected only finland and NL because we only ran models on these data
 
-df <- data %>% select(model, sex,datacountry,modelcountry, matches("AUPR")) %>%
+dfadj <- data %>% select(model, sex,datacountry,modelcountry, matches("AUPRadj")) %>%
+  pivot_longer(-c(model, sex,datacountry,modelcountry)) %>%
+  separate(name, c("metric", "type"), sep=" ") %>%
+  pivot_wider(names_from="type")
+
+for (i in 1:length(countries)){
+  dfadj %>%
+  subset(dfadj$datacountry == countries[i])%>%
+  mutate(Id = fct_rev(model)) %>%
+  ggplot(aes(x=value, 
+             xmin=low, 
+             xmax=high, 
+             y=Id, 
+             #shape = datacountry, 
+             color = modelcountry)) +
+  guides(color = guide_legend(reverse = TRUE))+ #reverses the order of the legend, because apparently it is not displayed in the same order as the countries in the plot
+  geom_pointrange(position = position_dodge(width= 0.6), size = 0.35) +
+  labs(title=paste0("Data from ", countries[i], sep=""),  
+       #shape = "Data from",
+       color = "Model trained in") +
+  #lims(x=c(0,1)) +                 # This drops the whole confidence interval if it is party outside limits
+  coord_cartesian(xlim=c(0, 1)) +   # Unlike above, this only cuts the interval instead of dropping
+  facet_grid(cols = vars(sex)) + xlab("AUPR adjusted for deferral rate")
+
+FileName <- paste(FolderName, "/Modelperformance_AUPRadj_Data", countries[i] ,".png",sep="")
+ggsave(FileName, width = 7, height = 4)
+}
+
+df <- data %>% select(model, sex,datacountry,modelcountry, matches("AUPR ")) %>%
   pivot_longer(-c(model, sex,datacountry,modelcountry)) %>%
   separate(name, c("metric", "type"), sep=" ") %>%
   pivot_wider(names_from="type")
@@ -103,7 +131,7 @@ for (i in 1:length(countries)){
              #shape = datacountry, 
              color = modelcountry)) +
   guides(color = guide_legend(reverse = TRUE))+ #reverses the order of the legend, because apparently it is not displayed in the same order as the countries in the plot
-  geom_pointrange(position = position_dodge(width= 0.6)) +
+  geom_pointrange(position = position_dodge(width= 0.6), size = 0.35) +
   labs(title=paste0("Data from ", countries[i], sep=""),  
        #shape = "Data from",
        color = "Model trained in") +
@@ -114,5 +142,4 @@ for (i in 1:length(countries)){
 FileName <- paste(FolderName, "/Modelperformance_AUPR_Data", countries[i] ,".png",sep="")
 ggsave(FileName, width = 7, height = 4)
 }
-
 ```
