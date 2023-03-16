@@ -81,11 +81,10 @@ data <- bind_rows(datalist) %>%
 
 ```{r make figures}
 currentDate <- format(Sys.time(), "%Y-%m-%d")
-FolderName <- paste("C:/Users/meule01a/OneDrive - Sanquin/A4 Project SanguinStats (OD)/07 Resultaten/20230301 SanguinStats results overview/figures/", currentDate,sep="")
+FolderName <- paste("C:/Users/meule01a/OneDrive - Sanquin/A4 Project SanguinStats (OD)/07 Resultaten/20230301 SanguinStats results overview/figures/", currentDate,"/AUPRadj",sep="")
 dir.create(FolderName)
 
 countries <- c("Netherlands","Finland","South Africa","Australia", "Belgium")
-countries <- c("Netherlands","Finland","South Africa","Australia") #selected only finland and NL because we only ran models on these data
 
 dfadj <- data %>% select(model, sex,datacountry,modelcountry, matches("AUPRadj")) %>%
   pivot_longer(-c(model, sex,datacountry,modelcountry)) %>%
@@ -111,9 +110,12 @@ for (i in 1:length(countries)){
   coord_cartesian(xlim=c(0, 1)) +   # Unlike above, this only cuts the interval instead of dropping
   facet_grid(cols = vars(sex)) + xlab("AUPR adjusted for deferral rate")
 
-FileName <- paste(FolderName, "/Modelperformance_AUPRadj_Data", countries[i] ,".png",sep="")
+FileName <- paste(FolderName, "/Modelperformance_Data_", countries[i] ,".png",sep="")
 ggsave(FileName, width = 7, height = 4)
 }
+
+FolderName <- paste("C:/Users/meule01a/OneDrive - Sanquin/A4 Project SanguinStats (OD)/07 Resultaten/20230301 SanguinStats results overview/figures/", currentDate,"/AUPR",sep="")
+dir.create(FolderName)
 
 df <- data %>% select(model, sex,datacountry,modelcountry, matches("AUPR ")) %>%
   pivot_longer(-c(model, sex,datacountry,modelcountry)) %>%
@@ -139,7 +141,7 @@ for (i in 1:length(countries)){
   coord_cartesian(xlim=c(0, 1)) +   # Unlike above, this only cuts the interval instead of dropping
   facet_grid(cols = vars(sex)) + xlab("AUPR")
 
-FileName <- paste(FolderName, "/Modelperformance_AUPR_Data", countries[i] ,".png",sep="")
+FileName <- paste(FolderName, "/Modelperformance_Data_", countries[i] ,".png",sep="")
 ggsave(FileName, width = 7, height = 4)
 }
 ```
