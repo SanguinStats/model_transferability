@@ -1,0 +1,342 @@
+---
+title: "Model averaging"
+author: "Jarkko Toivonen"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(pROC)
+library(boot)
+base_dir <- "~/FRCBS/Hb_predictor_container/results"
+fsummary <- function(df) df %>% mutate(across(where(is.character), as.factor)) %>% summary()
+countries <- c("Australia", "Belgium", "Finland", "Netherlands", "South-Africa", "Average") 
+result_path <- "../results"
+fig_path <- file.path(result_path, "figures")
+```
+
+## TODO
+
+- Find out why Belgian 5don4hb model has different data than in other countries.
+
+## Get Finnish data
+
+These are not used yet.
+
+```{r}
+validate_subdirectories <- tribble(
+  ~Data_country, ~Model, ~Subdirectory,
+  "Finland", "2don", "jarkko-2023-03-28-get-data-Australia_2don",
+  "Finland", "5don", "jarkko-2023-03-28-get-data-Australia_5don",
+  "Finland", "5don4hb", "jarkko-2023-03-28-get-data-Australia_5don4hb",
+)
+validate_datas <- validate_subdirectories %>%
+  mutate(sex=list(c("male", "female"))) %>% 
+  unnest_longer(sex) %>%
+  mutate(data_file = file.path(base_dir, Subdirectory, sprintf("rf-validate-%s.rds", sex))) %>%
+  mutate(df = map(data_file, function(filename) readRDS(filename)))
+```
+
+
+## Get the deferral probabilities from the result files
+
+```{r}
+subdirectories <- tribble(
+  ~Model_country, ~Model, ~Subdirectory,
+  "Belgium", "2don", "jarkko-2023-03-24-Belgium_2don",
+  "Belgium", "5don", "jarkko-2023-03-24-Belgium_5don",
+  "Belgium", "5don4hb", "jarkko-2023-03-24-Belgium_5don4hb",
+  "South-Africa", "2don", "jarkko-2023-02-28-South_Africa_2don",
+  "South-Africa", "5don", "jarkko-2023-02-28-South_Africa_5don",
+  "South-Africa", "5don4hb", "jarkko-2023-02-28-South_Africa_5don4hb",
+  "Australia", "2don", "jarkko-2023-02-27-Australia_2don",
+  "Australia", "5don", "jarkko-2023-02-27-Australia_5don",
+  "Australia", "5don4hb", "jarkko-2023-02-27-Australia_5don4hb",
+  "Netherlands", "2don", "jarkko-2023-01-31-2don",
+  "Netherlands", "5don", "jarkko-2023-01-31-5don",
+  "Netherlands", "5don4hb", "jarkko-2023-01-31-5don4hb",
+  "Finland", "2don", "jarkko-2023-01-17-model1-l-2",
+  "Finland", "5don", "jarkko-2023-01-17-model2-l-5",
+  "Finland", "5don4hb", "jarkko-2023-01-17-model3-l-5-hb4"
+)
+```
+
+```{r}
+datas2 <- subdirectories %>%
+  mutate(Data_country = "Finland",
+         prediction_file = file.path(base_dir, Subdirectory, "prediction.csv"),
+         df = map(prediction_file, function(filename) read_csv(filename, show_col_types = FALSE)))
+```
+
+```{r}
+datas <- datas2 %>% select(-c(Subdirectory, prediction_file))
+```
+
+Check that all result files have same number of rows.
+
+```{r}
+map_int(datas$df, nrow)
+```
+
+Sample size was 10 000 and the validate set size was 1600. This number of observations are available for both sexes, hence 3200.
+
+## Average models
+
+### Compute average
+
+```{r}
+df <- datas %>% 
+  unnest(cols=df) %>% 
+  select(-c(id, model, predicted_value, f1_threshold, predicted_label, score_predicted_label)) %>% 
+  filter(!(Model_country == "Belgium" & Model == "5don4hb")) %>%
+  group_by(Model_country, Model, sex) %>% 
+  mutate(n=1:n()) %>%   # Unique identifier for each observation
+  ungroup() 
+df <- df %>% 
+  pivot_wider(names_from=Model_country, values_from=score, 
+              id_cols=c(sex, n, Model, original_value, original_label)) #%>%
+  #drop_na()
+df <- df %>% 
+  rowwise() %>% 
+  mutate(Average = mean(c_across(any_of(countries)), na.rm=TRUE)) %>% ungroup()
+df
+summary(df)
+```
+
+
+
+
+```{r}
+df2 <- df %>% pivot_longer(cols = all_of(countries), 
+                           names_to = "Model_country",
+                           values_to = "score")
+```
+
+### ROC
+
+```{r ROC function}
+create_roc_new <- function(labels, score, boot.n=2000) {
+  message("Computing the ROC curve")
+  tryCatch(error = function(cnd) {
+    t <- table(labels, useNA = "always")
+    #if (is.null(names(t))) {
+      mynames <- c("Accepted (0)", "Deferred (1)")
+    #} else mynames <- names(t)
+    s <- paste(sprintf("%s: %i", mynames, t), collapse=", ")   # Show the distribution of factor levels in the error message
+    cnd$message <- paste("\nThe distribution of response levels is:", s, cnd$message, sep="\n")
+    stop(cnd)
+  },
+           roc <- pROC::roc(response = labels,
+                            predictor = score,
+                            #smoothed = TRUE,
+                            auc = TRUE,
+                            legacy.axes = TRUE,   # x-axis is False positive rate instead of specificity
+                            xlab = "False Positive Rate", ylab = "True Positive Rate",
+                            #percent = TRUE,
+                            # arguments for ci
+                            ci=TRUE, 
+                            conf.level=0.95, 
+                            boot.stratified=TRUE,
+                            boot.n=boot.n,
+                            # arguments for plot
+                            plot=FALSE, #plot=TRUE, 
+                            main="Receiver operating characteric",
+                            #auc.polygon=TRUE, 
+                            max.auc.polygon=TRUE, 
+                            #grid=TRUE,
+                            print.auc=TRUE 
+                            #show.thres=FALSE
+           )
+  )
+  AUC <- roc$auc
+  #title <- "Receiver operating characteristic"
+  title <- "ROC"
+  #title <- sprintf("Receiver operating characteristicc (AUC=%.3f)", AUC)
+  c <- as.numeric(roc$ci)
+  ci <- tibble("AUROC value"=c[2], "AUROC low"=c[1], "AUROC high"=c[3])
+  roc_plot <- pROC::ggroc(roc, legacy.axes=TRUE) +
+    geom_abline(aes(intercept=0, slope=1), color="lightgray") +
+    annotate(geom="text", label=sprintf("AUROC: %.2f (%.2f–%.2f)", c[2], c[1], c[3]), x=0.5, y=0.125) +
+    labs(title=title, x = "False positive rate", y = "True positive rate")
+  return(list(roc_plot=roc_plot, roc=roc, roc_auc=AUC, roc_ci=ci))
+}
+
+```
+
+```{r, results='hide', message=FALSE}
+# Compute AUROC values
+res_auc <- df2 %>% 
+  filter(!(Model == "5don4hb" & Model_country=="Belgium")) %>%
+  group_by(sex, Model, Model_country) %>% 
+  summarise(obj = list(create_roc_new(original_label, score)), .groups="drop") %>%
+  # Make roc_plt, roc object, roc_auc and roc_ci as columns
+  hoist(obj, "roc_plot", "roc", "roc_auc", "roc_ci", .simplify=FALSE) %>%
+  unnest(roc_ci)
+  # unnest_longer(obj) %>%     # For some reason I cannot directly use unnest_wider.
+  # pivot_wider(names_from=obj_id, values_from = obj) %>% 
+  # mutate(across(c(roc_plot, roc, roc_auc, roc_ci), unname))
+```
+
+
+```{r}
+g <- res_auc %>%
+  mutate(Model_country = factor(Model_country, levels=countries)) %>%
+  mutate(Model_country = fct_rev(Model_country)) %>%
+  ggplot(aes(y=Model_country, x=`AUROC value`, xmin=`AUROC low`, xmax=`AUROC high`)) + 
+  geom_pointrange(position = position_dodge(width=0.5)) +
+  lims(x=0:1) +
+  facet_grid(sex~Model)
+g
+filename <- file.path(fig_path, "model_average_finnish_data_auroc.png")
+#ggsave(filename, g)
+```
+
+### Precision-recall
+
+```{r Precision-recall function}
+# It seems that the number of replicates must be at least as high as the number of rows in the dataframe
+# https://stat.ethz.ch/pipermail/r-help/2011-February/269006.html
+# boot.n is the number of bootstrap replications, if null use as many replications as there are rows in the dataframe
+precision_recall_ci <- function(df, method="norm", boot.n=NULL) {
+  
+  get_aupr <- function(df, indices) {
+    df2 <- df[indices,]
+    pb$tick()  # update progress bar
+    aupr <- PRROC::pr.curve(scores.class0=df2$score, weights.class0=df2$original_label)$auc.davis.goadrich
+    return(aupr)
+  }
+    
+  df <- df %>% select(original_label, score)
+  if (is.null(boot.n)) {
+    boot.n <- nrow(df)
+  }
+  
+  pb <- progress::progress_bar$new(total = boot.n+1)# init progress bar
+  pb$tick(0)
+  #p <- progress_estimated(n+1)  # init progress bar
+  #b <- boot(df, statistic = get_aupr, R=boot.n, sim="ordinary", stype="i", strata=df$original_label, parallel="multicore")#, ncpus=1)
+  b <- boot(df, statistic = get_aupr, R=boot.n, sim="ordinary", stype="i", strata=df$original_label, parallel="no")#, ncpus=1)
+  ret <- tryCatch(
+    error = function(cnd) return(-1),
+    {
+      result <- boot.ci(b, conf=0.95, type=method)
+      var <- recode(method, "norm"="normal", "perc"="percent", "stud"="student")  # The name of the output field is stupidly sometimes not the same as the parameter name
+      ci <- if (method=="norm") result[[var]][2:3] else result[[var]][4:5]
+      NULL
+    })
+  if (!is.null(ret) && ret == -1) {
+    ci <- C(NA, NA)
+  }
+  return(list(ci=ci, result=result))
+}
+  
+create_precision_recall_new <- function(original_label, score, method="norm", boot.n=2000) {
+  debug <- TRUE
+  message("Computing the precision-recall curve")
+  pr_model     <- PRROC::pr.curve(scores.class0=score, weights.class0=original_label, curve=TRUE, rand.compute=TRUE)
+  if (debug) message("hep1")
+  points <- data.frame(pr_model$curve)
+  if (debug) message("hep2")
+  AUPR <- pr_model$auc.davis.goadrich
+  df <- tibble(original_label=original_label, score=score)
+  if (debug) message("hep3")
+  prci <- precision_recall_ci(df, method=method, boot.n=boot.n)$ci
+  if (debug) message("tassa1")
+  title <- "Precision-recall"
+  m <- mean(original_label)
+  if (debug) message("tassa2")
+  pr_plot <- ggplot(points, aes(x=X1,y=X2)) +
+    geom_hline(aes(yintercept=m), color="lightgray") +   # theoretical PR curve of random classifier
+    annotate(geom="text", label=sprintf("y=%.2f", m), x=0.25, y=m, vjust=-1) +
+    geom_line() +
+    annotate(geom="text", label=sprintf("AUPR: %.2f (%.2f–%.2f)", AUPR, prci[1], prci[2]), x=0.5, y=0.875) +
+    scale_y_continuous(limits=c(0.0, 1.0)) +
+    labs(x="Recall",y="Precision", title=title)
+  if (debug) message("tassa3")
+  ci <- tibble("AUPR value"=AUPR, "AUPR low"=prci[1], "AUPR high"=prci[2])
+  if (debug) message("tassa4")
+  return(list(pr_plot=pr_plot, pr=points, pr_auc=AUPR, pr_ci=ci))
+}
+
+```
+
+
+```{r, results='hide', message=FALSE}
+# Compute AUPR values
+res_pr <- df2 %>% 
+  filter(!(Model == "5don4hb" & Model_country=="Belgium")) %>%
+  group_by(sex, Model, Model_country) %>% 
+  summarise(obj = list(create_precision_recall_new(original_label, score)), .groups="drop") %>%
+  # Make pr_plt, pr object, pr_auc and pr_ci as columns
+  hoist(obj, "pr_plot", "pr", "pr_auc", "pr_ci", .simplify=FALSE) %>%
+  unnest(pr_ci)
+```
+
+
+```{r}
+g <- res_pr %>%
+  mutate(Model_country = factor(Model_country, levels=countries)) %>%
+  mutate(Model_country = fct_rev(Model_country)) %>%
+  ggplot(aes(y=Model_country, x=`AUPR value`, xmin=`AUPR low`, xmax=`AUPR high`)) + 
+  geom_pointrange(position = position_dodge(width=0.5)) + 
+  lims(x=0:1) +
+  facet_grid(sex~Model)
+g
+filename <- file.path(fig_path, "model_average_finnish_data_aupr.png")
+#ggsave(filename, g)
+```
+
+## Co-occurrence
+
+How often models predict each label?
+
+```{r}
+df_with_pred <- df2 %>% 
+  mutate(predicted_label = as.integer(score >= 0.5))
+df_with_pred %>% select(Model_country, predicted_label, sex, Model) %>% table()
+```
+
+```{r}
+cooccurrence <- df_with_pred %>% 
+  #filter(Model=="2don", sex=="female") %>% 
+  group_by(Model, sex, n, predicted_label) %>%
+  summarise(x = list(expand.grid(Model_country, Model_country)), .groups="drop") %>% 
+  unnest(x) %>% 
+  count(Model, sex, Var1, Var2) %>%
+  mutate(across(c("Var1", "Var2"), function(x) fct_relevel(x, countries)))
+```
+
+
+```{r}
+cooccurrence %>%
+  filter(Var1 != "Average" & Var2 != "Average") %>%
+  mutate(Var2 = fct_rev(Var2)) %>%
+  ggplot(aes(x=Var1, y=Var2, fill=n)) + 
+  geom_raster() +
+  geom_text(aes(label=n), color="white", size=3) +
+  labs(x="Model country", y="Model country", title="How often two countries predict the same label", 
+       subtitle="Finnish data", fill="Count") +
+  facet_grid(sex ~ Model) +
+  theme(legend.position="bottom",
+        axis.text.x = element_text(angle = 45, vjust=1, hjust=1),
+        legend.text = element_text(angle = 45, vjust=1, hjust=1))
+```
+
+```{r}
+df_with_pred %>%
+  ggplot(aes(original_value, score, color=Model_country)) +
+  geom_line() +
+  #geom_point() +
+  geom_smooth() +
+  labs(x="Hb", y="Probability of deferral", title="Finnish data") +
+  facet_wrap(sex ~ Model) +
+  theme(legend.position="bottom")
+```
+
+
+
+
