@@ -26,7 +26,7 @@ library(tidyverse)
 ```
 
 ```{r load models and data}
-path <- "C:/Users/meule01a/OneDrive - Sanquin/A4 Project SanguinStats (OD)/07 Resultaten/20230301 SanguinStats results overview/results/"
+path <- "C:/Users/meule01a/OneDrive - Sanquin/A4 Project SanguinStats (OD)/07 Resultaten/results/"
 folders <- list.dirs(path, full.names=FALSE, recursive=FALSE)
 
 datalist <- lapply(folders, load_files, target_name='/sizes.csv')
@@ -44,7 +44,8 @@ data_sizes <- bind_rows(datalist) %>%
                              modelcountry=='NL' ~ 'Netherlands',
                              modelcountry=='FI' ~ 'Finland',
                              modelcountry=='SA' ~ 'South Africa',
-                             modelcountry=='AU' ~ 'Australia'),
+                             modelcountry=='AU' ~ 'Australia',
+                             modelcountry=='AU2' ~ 'Australia2'),
          datacountry = case_when(datacountry=='BE' ~ 'Belgium',
                              datacountry=='NL' ~ 'Netherlands',
                              datacountry=='FI' ~ 'Finland',
@@ -62,7 +63,8 @@ data <- bind_rows(datalist) %>%
                              modelcountry=='NL' ~ 'Netherlands',
                              modelcountry=='FI' ~ 'Finland',
                              modelcountry=='SA' ~ 'South Africa',
-                             modelcountry=='AU' ~ 'Australia'),
+                             modelcountry=='AU' ~ 'Australia', 
+                             modelcountry=='AU2' ~ 'Australia2'),
          datacountry = case_when(datacountry=='BE' ~ 'Belgium',
                              datacountry=='NL' ~ 'Netherlands',
                              datacountry=='FI' ~ 'Finland',
@@ -77,11 +79,12 @@ data <- bind_rows(datalist) %>%
   rename("AUPR value"="AUPR.value","AUPR low"="AUPR.low","AUPR high"="AUPR.high","AUPRadj value"="AUPRadj.value","AUPRadj low"="AUPRadj.low","AUPRadj high"="AUPRadj.high")
 ```
 
-
-
 ```{r make figures}
 currentDate <- format(Sys.time(), "%Y-%m-%d")
-FolderName <- paste("C:/Users/meule01a/OneDrive - Sanquin/A4 Project SanguinStats (OD)/07 Resultaten/20230301 SanguinStats results overview/figures/", currentDate,"/AUPRadj",sep="")
+FolderName <- paste("C:/Users/meule01a/OneDrive - Sanquin/A4 Project SanguinStats (OD)/07 Resultaten/figures/", currentDate,sep="")
+dir.create(FolderName)
+
+FolderName <- paste("C:/Users/meule01a/OneDrive - Sanquin/A4 Project SanguinStats (OD)/07 Resultaten/figures/", currentDate,"/AUPRadj",sep="")
 dir.create(FolderName)
 
 countries <- c("Netherlands","Finland","South Africa","Australia", "Belgium")
@@ -102,7 +105,7 @@ for (i in 1:length(countries)){
              #shape = datacountry, 
              color = modelcountry)) +
   guides(color = guide_legend(reverse = TRUE))+ #reverses the order of the legend, because apparently it is not displayed in the same order as the countries in the plot
-  geom_pointrange(position = position_dodge(width= 0.6), size = 0.35) +
+  geom_pointrange(position = position_dodge(width= 0.6), size = 0.35, fatten = 0.8) +
   labs(title=paste0("Data from ", countries[i], sep=""),  
        #shape = "Data from",
        color = "Model trained in") +
@@ -114,7 +117,10 @@ FileName <- paste(FolderName, "/Modelperformance_Data_", countries[i] ,".png",se
 ggsave(FileName, width = 7, height = 4)
 }
 
-FolderName <- paste("C:/Users/meule01a/OneDrive - Sanquin/A4 Project SanguinStats (OD)/07 Resultaten/20230301 SanguinStats results overview/figures/", currentDate,"/AUPR",sep="")
+FolderName <- paste("C:/Users/meule01a/OneDrive - Sanquin/A4 Project SanguinStats (OD)/07 Resultaten/figures/", currentDate,sep="")
+dir.create(FolderName)
+
+FolderName <- paste("C:/Users/meule01a/OneDrive - Sanquin/A4 Project SanguinStats (OD)/07 Resultaten/figures/", currentDate,"/AUPR",sep="")
 dir.create(FolderName)
 
 df <- data %>% select(model, sex,datacountry,modelcountry, matches("AUPR ")) %>%
@@ -133,7 +139,7 @@ for (i in 1:length(countries)){
              #shape = datacountry, 
              color = modelcountry)) +
   guides(color = guide_legend(reverse = TRUE))+ #reverses the order of the legend, because apparently it is not displayed in the same order as the countries in the plot
-  geom_pointrange(position = position_dodge(width= 0.6), size = 0.35) +
+  geom_pointrange(position = position_dodge(width= 0.6), size = 0.35, fatten = 0.8) +
   labs(title=paste0("Data from ", countries[i], sep=""),  
        #shape = "Data from",
        color = "Model trained in") +
