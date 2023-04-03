@@ -43,9 +43,10 @@ data_sizes <- bind_rows(datalist) %>%
          modelcountry = case_when(modelcountry=='BE' ~ 'Belgium',
                              modelcountry=='NL' ~ 'Netherlands',
                              modelcountry=='FI' ~ 'Finland',
-                             modelcountry=='SA' ~ 'South Africa',
-                             modelcountry=='AU' ~ 'Australia',
-                             modelcountry=='AU2' ~ 'Australia2'),
+                             modelcountry=='SA' ~ 'South Africa (12.5/13.5 cut off)',
+                             modelcountry=='SA2' ~ 'South Africa (12/13 cut off)',
+                             modelcountry=='AU' ~ 'Australia (12/13 cut off)', 
+                             modelcountry=='AU2' ~ 'Australia (12.5/13.5 cut off)'),
          datacountry = case_when(datacountry=='BE' ~ 'Belgium',
                              datacountry=='NL' ~ 'Netherlands',
                              datacountry=='FI' ~ 'Finland',
@@ -62,9 +63,10 @@ data <- bind_rows(datalist) %>%
   mutate(modelcountry = case_when(modelcountry=='BE' ~ 'Belgium',
                              modelcountry=='NL' ~ 'Netherlands',
                              modelcountry=='FI' ~ 'Finland',
-                             modelcountry=='SA' ~ 'South Africa',
-                             modelcountry=='AU' ~ 'Australia', 
-                             modelcountry=='AU2' ~ 'Australia2'),
+                             modelcountry=='SA' ~ 'South Africa (12.5/13.5 cut off)',
+                             modelcountry=='SA2' ~ 'South Africa (12/13 cut off)',
+                             modelcountry=='AU' ~ 'Australia (12/13 cut off)', 
+                             modelcountry=='AU2' ~ 'Australia (12.5/13.5 cut off)'),
          datacountry = case_when(datacountry=='BE' ~ 'Belgium',
                              datacountry=='NL' ~ 'Netherlands',
                              datacountry=='FI' ~ 'Finland',
@@ -114,7 +116,7 @@ for (i in 1:length(countries)){
   facet_grid(cols = vars(sex)) + xlab("AUPR adjusted for deferral rate")
 
 FileName <- paste(FolderName, "/Modelperformance_Data_", countries[i] ,".png",sep="")
-ggsave(FileName, width = 7, height = 4)
+ggsave(FileName, width = 9, height = 4)
 }
 
 FolderName <- paste("C:/Users/meule01a/OneDrive - Sanquin/A4 Project SanguinStats (OD)/07 Resultaten/figures/", currentDate,sep="")
@@ -148,6 +150,6 @@ for (i in 1:length(countries)){
   facet_grid(cols = vars(sex)) + xlab("AUPR")
 
 FileName <- paste(FolderName, "/Modelperformance_Data_", countries[i] ,".png",sep="")
-ggsave(FileName, width = 7, height = 4)
+ggsave(FileName, width = 9, height = 4)
 }
 ```
