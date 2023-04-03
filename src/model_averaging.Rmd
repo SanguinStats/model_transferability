@@ -27,6 +27,10 @@ fig_path <- file.path(result_path, "figures")
 
 These are not used yet.
 
+In the container, just before fitting the (random forest) model the train and validation data sets are saved to files,
+e.g. `/tmp/rf-validate-male.rds`. Before the container is killed, these files can be copies out with the `docker cp` command,
+e.g. `docker cp kind_brahmagupta:/tmp/rf-validate-male.rds .`, where `kind_brahmagupta` is the name of the container.
+
 ```{r}
 validate_subdirectories <- tribble(
   ~Data_country, ~Model, ~Subdirectory,
@@ -65,6 +69,10 @@ subdirectories <- tribble(
 )
 ```
 
+
+Get the predictions. Note that it is not obvious that the same observation are sampled and that they are in the same order. For instance, here the results from the Belgian 5don4hb model doesn't seem to match the results from the other models. It would be
+better to fix the data set and predict the observations again with different models using the fixed data.
+
 ```{r}
 datas2 <- subdirectories %>%
   mutate(Data_country = "Finland",
@@ -92,7 +100,7 @@ Sample size was 10 000 and the validate set size was 1600. This number of observ
 df <- datas %>% 
   unnest(cols=df) %>% 
   select(-c(id, model, predicted_value, f1_threshold, predicted_label, score_predicted_label)) %>% 
-  filter(!(Model_country == "Belgium" & Model == "5don4hb")) %>%
+  filter(!(Model_country == "Belgium" & Model == "5don4hb")) %>%  # This is a problematic case
   group_by(Model_country, Model, sex) %>% 
   mutate(n=1:n()) %>%   # Unique identifier for each observation
   ungroup() 
@@ -102,7 +110,8 @@ df <- df %>%
   #drop_na()
 df <- df %>% 
   rowwise() %>% 
-  mutate(Average = mean(c_across(any_of(countries)), na.rm=TRUE)) %>% ungroup()
+  mutate(Average = mean(c_across(any_of(countries)), na.rm=TRUE)) %>% 
+  ungroup()
 df
 summary(df)
 ```
@@ -328,6 +337,8 @@ cooccurrence %>%
 
 ```{r}
 df_with_pred %>%
+  filter(!(sex == "male" & original_value < 125)) %>%
+  filter(Model_country != "Average") %>%
   ggplot(aes(original_value, score, color=Model_country)) +
   geom_line() +
   #geom_point() +
