@@ -43,15 +43,17 @@ data_sizes <- bind_rows(datalist) %>%
          modelcountry = case_when(modelcountry=='BE' ~ 'Belgium',
                              modelcountry=='NL' ~ 'Netherlands',
                              modelcountry=='FI' ~ 'Finland',
-                             modelcountry=='SA' ~ 'South Africa (12.5/13.5 cut off)',
-                             modelcountry=='SA2' ~ 'South Africa (12/13 cut off)',
-                             modelcountry=='AU' ~ 'Australia (12/13 cut off)', 
-                             modelcountry=='AU2' ~ 'Australia (12.5/13.5 cut off)'),
+                             modelcountry=='SA' ~ 'South Africa (EU cut off)',
+                             modelcountry=='SA2' ~ 'South Africa (Own cut off)',
+                             modelcountry=='AU' ~ 'Australia (Own cut off)', 
+                             modelcountry=='AU2' ~ 'Australia (EU cut off)'),
          datacountry = case_when(datacountry=='BE' ~ 'Belgium',
                              datacountry=='NL' ~ 'Netherlands',
                              datacountry=='FI' ~ 'Finland',
-                             datacountry=='SA' ~ 'South Africa',
-                             datacountry=='AU' ~ 'Australia')) %>%
+                             datacountry=='SA' ~ 'South Africa (EU cut off)',
+                             datacountry=='AU' ~ 'Australia (Own cut off)',
+                             datacountry=='AU2' ~ 'Australia (EU cut off)',
+                             datacountry=='SA2'~ 'South Africa (Own cut off)')) %>%
   
   select(model, datacountry, modelcountry, sex, label, deferral_rate) %>%
   pivot_wider(names_from=label, names_prefix='defrate_', values_from=deferral_rate)
@@ -63,15 +65,17 @@ data <- bind_rows(datalist) %>%
   mutate(modelcountry = case_when(modelcountry=='BE' ~ 'Belgium',
                              modelcountry=='NL' ~ 'Netherlands',
                              modelcountry=='FI' ~ 'Finland',
-                             modelcountry=='SA' ~ 'South Africa (12.5/13.5 cut off)',
-                             modelcountry=='SA2' ~ 'South Africa (12/13 cut off)',
-                             modelcountry=='AU' ~ 'Australia (12/13 cut off)', 
-                             modelcountry=='AU2' ~ 'Australia (12.5/13.5 cut off)'),
+                             modelcountry=='SA' ~ 'South Africa (EU cut off)',
+                             modelcountry=='SA2' ~ 'South Africa (Own cut off)',
+                             modelcountry=='AU' ~ 'Australia (Own cut off)', 
+                             modelcountry=='AU2' ~ 'Australia (EU cut off)'),
          datacountry = case_when(datacountry=='BE' ~ 'Belgium',
                              datacountry=='NL' ~ 'Netherlands',
                              datacountry=='FI' ~ 'Finland',
-                             datacountry=='SA' ~ 'South Africa',
-                             datacountry=='AU' ~ 'Australia')) %>%
+                             datacountry=='SA' ~ 'South Africa (EU cut off)',
+                             datacountry=='AU' ~ 'Australia (Own cut off)',
+                             datacountry=='AU2' ~ 'Australia (EU cut off)',
+                             datacountry=='SA2'~ 'South Africa (Own cut off)')) %>%
          #sex = as.factor(Sex)) %>%
   merge(data_sizes, by=c('model', 'sex', 'datacountry', 'modelcountry'), all.x=TRUE) %>%
   mutate(AUPRadj.value = (AUPR.value - defrate_validate),
@@ -86,10 +90,11 @@ currentDate <- format(Sys.time(), "%Y-%m-%d")
 FolderName <- paste("C:/Users/meule01a/OneDrive - Sanquin/A4 Project SanguinStats (OD)/07 Resultaten/figures/", currentDate,sep="")
 dir.create(FolderName)
 
-FolderName <- paste("C:/Users/meule01a/OneDrive - Sanquin/A4 Project SanguinStats (OD)/07 Resultaten/figures/", currentDate,"/AUPRadj",sep="")
+FolderName <- paste("C:/Users/meule01a/OneDrive - Sanquin/A4 Project SanguinStats (OD)/07 Resultaten/figures/", currentDate,"/AUPRadj_SanguinStatsMeeting",sep="")
 dir.create(FolderName)
 
-countries <- c("Netherlands","Finland","South Africa","Australia", "Belgium")
+countries <- c("Netherlands","Finland","South Africa (Own cut off)", "South Africa (EU cut off)","Australia (Own cut off)", "Australia (EU cut off)", "Belgium")
+countries <- c("Netherlands","Finland","Australia (Own cut off)", "Australia (EU cut off)", "Belgium")
 
 dfadj <- data %>% select(model, sex,datacountry,modelcountry, matches("AUPRadj")) %>%
   pivot_longer(-c(model, sex,datacountry,modelcountry)) %>%
@@ -122,7 +127,7 @@ ggsave(FileName, width = 9, height = 4)
 FolderName <- paste("C:/Users/meule01a/OneDrive - Sanquin/A4 Project SanguinStats (OD)/07 Resultaten/figures/", currentDate,sep="")
 dir.create(FolderName)
 
-FolderName <- paste("C:/Users/meule01a/OneDrive - Sanquin/A4 Project SanguinStats (OD)/07 Resultaten/figures/", currentDate,"/AUPR",sep="")
+FolderName <- paste("C:/Users/meule01a/OneDrive - Sanquin/A4 Project SanguinStats (OD)/07 Resultaten/figures/", currentDate,"/AUPR_SanguinStatsMeeting",sep="")
 dir.create(FolderName)
 
 df <- data %>% select(model, sex,datacountry,modelcountry, matches("AUPR ")) %>%
