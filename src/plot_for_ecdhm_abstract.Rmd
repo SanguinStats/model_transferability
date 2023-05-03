@@ -1,0 +1,81 @@
+---
+title: "Plot for ECDHM 2023 abstract"
+author: "Jarkko Toivonen"
+date: "2023-05-03"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+result_dir <- "../results"
+```
+
+## R Markdown
+
+```{r}
+get_deferral_rates <- function(df) {
+  df %>% 
+    filter(label == "validate") %>%
+    mutate(deferral_rate = `Deferred last donations` / `Donors`,
+           sex = str_remove(Id, "rf-")) %>%
+    select(sex, deferral_rate)
+}
+deferral_rates <- tribble(
+  ~data_country, ~filename, 
+  "Australia", file.path(result_dir, "Model1-AU-AU/sizes.csv"),
+  "South-Africa", file.path(result_dir, "Model1-SA-SA/sizes.csv")
+)
+deferral_rates <- deferral_rates %>%
+  mutate(tmp = map(filename, function(f) get_deferral_rates(read_csv(f)))) %>%
+  unnest(tmp)
+```
+
+```{r}
+helper <- function(filename) {
+  df <- read_csv(filename)
+  df %>% select(sex = Sex, starts_with("AUPR"))
+}
+auprs <- tribble(
+  ~model_country, ~data_country, ~filename,
+  "Australia", "Australia", file.path(result_dir, "Model1-AU-AU/summary.csv"),
+#  "Australia", "South-Africa", file.path(result_dir, "Model1-AU-SA/summary.csv"),
+  "South-Africa", "Australia", file.path(result_dir, "Model1-SA-AU/summary.csv"),
+  "South-Africa", "South-Africa", file.path(result_dir, "Model1-SA-SA/summary.csv")
+)
+auprs <- auprs %>%
+  mutate(tmp = map(filename, helper)) %>%
+  unnest(tmp)
+```
+
+```{r}
+both <- inner_join(auprs, deferral_rates, by=c("data_country", "sex"))
+```
+
+```{r}
+g <-both %>%
+  ggplot(aes(deferral_rate, `AUPR value`, ymin=`AUPR low`, ymax=`AUPR high`, color=model_country, shape=data_country)) +
+  geom_errorbar(position=position_dodge(width=0.01)) +
+  geom_point(position=position_dodge(width=0.01)) +
+  labs(x="Deferral rate", y="Area under PR curve", color="Model country", shape="Data country") +
+  facet_wrap(~sex)
+g
+ggsave(file.path(result_dir, "abtract_scatter.png"), g)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
