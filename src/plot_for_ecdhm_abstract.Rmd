@@ -9,6 +9,7 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 result_dir <- "../results"
+conv <- c(AU = "Australia", AU2 = "Australia2", BE ="Belgium", FI = "Finland", NL="Netherlands", SA="South-Africa", SA2="South-Africa2")
 ```
 
 ## R Markdown
@@ -21,48 +22,72 @@ get_deferral_rates <- function(df) {
            sex = str_remove(Id, "rf-")) %>%
     select(sex, deferral_rate)
 }
-deferral_rates <- tribble(
-  ~data_country, ~filename, 
-  "Australia", file.path(result_dir, "Model1-AU-AU/sizes.csv"),
-  "South-Africa", file.path(result_dir, "Model1-SA-SA/sizes.csv")
-)
+# deferral_rates <- tribble(
+#   ~data_country, ~filename, 
+#   "Australia", file.path(result_dir, "Model1-AU-AU/sizes.csv"),
+#   "South-Africa", file.path(result_dir, "Model1-SA-SA/sizes.csv")
+# )
+deferral_rates <- enframe(conv) %>%
+  rename(data_country = value, data_country_id=name) %>%
+  filter(data_country_id != "SA2") %>%
+  mutate(filename = sprintf("%s/Model1-%s-%s/sizes.csv", result_dir, data_country_id, data_country_id))
 deferral_rates <- deferral_rates %>%
-  mutate(tmp = map(filename, function(f) get_deferral_rates(read_csv(f)))) %>%
+  mutate(tmp = map(filename, function(f) get_deferral_rates(read_csv(f, show_col_types=FALSE)))) %>%
   unnest(tmp)
+deferral_rates
 ```
 
 ```{r}
 helper <- function(filename) {
-  df <- read_csv(filename)
+  df <- read_csv(filename, show_col_types=FALSE)
   df %>% select(sex = Sex, starts_with("AUPR"))
 }
-auprs <- tribble(
-  ~model_country, ~data_country, ~filename,
-  "Australia", "Australia", file.path(result_dir, "Model1-AU-AU/summary.csv"),
-#  "Australia", "South-Africa", file.path(result_dir, "Model1-AU-SA/summary.csv"),
-  "South-Africa", "Australia", file.path(result_dir, "Model1-SA-AU/summary.csv"),
-  "South-Africa", "South-Africa", file.path(result_dir, "Model1-SA-SA/summary.csv")
-)
+# auprs <- tribble(
+#   ~model_country, ~data_country, ~filename,
+#   "Australia", "Australia", file.path(result_dir, "Model1-AU-AU/summary.csv"),
+# #  "Australia", "South-Africa", file.path(result_dir, "Model1-AU-SA/summary.csv"),
+#   "South-Africa", "Australia", file.path(result_dir, "Model1-SA-AU/summary.csv"),
+#   "South-Africa", "South-Africa", file.path(result_dir, "Model1-SA-SA/summary.csv")
+# )
+auprs <- expand_grid(model_country_id=names(conv), data_country_id=(setdiff(names(conv), c("SA2", "SA")))) %>%
+  add_row(model_country_id="SA", data_country_id="SA") %>%
+  add_row(model_country_id="SA2", data_country_id="SA") %>%
+  mutate(model_country = conv[model_country_id], 
+         data_country = conv[data_country_id],
+         filename = sprintf("%s/Model1-%s-%s/summary.csv", result_dir, model_country_id, data_country_id))
 auprs <- auprs %>%
   mutate(tmp = map(filename, helper)) %>%
   unnest(tmp)
 ```
 
 ```{r}
-both <- inner_join(auprs, deferral_rates, by=c("data_country", "sex"))
+both <- inner_join(auprs, deferral_rates, by=c("data_country", "data_country_id", "sex"))
 ```
 
-```{r}
+```{r eval=FALSE}
 g <-both %>%
+  filter(!(str_starts(model_country_id, "SA") | str_starts(data_country_id, "SA"))) %>%
   ggplot(aes(deferral_rate, `AUPR value`, ymin=`AUPR low`, ymax=`AUPR high`, color=model_country, shape=data_country)) +
-  geom_errorbar(position=position_dodge(width=0.01)) +
-  geom_point(position=position_dodge(width=0.01)) +
+  geom_errorbar(position=position_jitter(width=0.01, height=0, seed=1)) +
+  geom_point(position=position_jitter(width=0.01, height=0, seed=1)) +
   labs(x="Deferral rate", y="Area under PR curve", color="Model country", shape="Data country") +
   facet_wrap(~sex)
 g
-ggsave(file.path(result_dir, "abtract_scatter.png"), g)
+#ggsave(file.path(result_dir, "abstract_scatter.png"), g)
 ```
 
+```{r}
+g <- both %>%
+  filter(!(str_starts(model_country_id, "SA2") | str_starts(data_country_id, "SA2"))) %>%
+  filter(!(str_starts(model_country_id, "AU2") | str_starts(data_country_id, "AU2"))) %>%
+  ggplot(aes(deferral_rate, `AUPR value`, ymin=`AUPR low`, ymax=`AUPR high`, color=model_country, shape=data_country)) +
+  geom_errorbar(position=position_jitter(width=0.01, height=0, seed=1)) +
+  geom_point(position=position_jitter(width=0.01, height=0, seed=1)) +
+  labs(x="Deferral rate", y="Area under PR curve", color="Model country", shape="Data country") +
+  facet_wrap(~sex)
+g
+ggsave(file.path(result_dir, "abstract_scatter.png"), g)
+```
 
 
 
