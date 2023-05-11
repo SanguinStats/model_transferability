@@ -67,28 +67,42 @@ both <- inner_join(auprs, deferral_rates, by=c("data_country", "data_country_id"
 ```{r eval=FALSE}
 g <-both %>%
   filter(!(str_starts(model_country_id, "SA") | str_starts(data_country_id, "SA"))) %>%
-  ggplot(aes(deferral_rate, `AUPR value`, ymin=`AUPR low`, ymax=`AUPR high`, color=model_country, shape=data_country)) +
+  ggplot(aes(deferral_rate, `AUPR value`, ymin=`AUPR low`, ymax=`AUPR high`, color=data_country, shape=model_country)) +
   geom_errorbar(position=position_jitter(width=0.01, height=0, seed=1)) +
   geom_point(position=position_jitter(width=0.01, height=0, seed=1)) +
-  labs(x="Deferral rate", y="Area under PR curve", color="Model country", shape="Data country") +
+  labs(x="Deferral rate", y="Area under PR curve", color="Data country", shape="Model country") +
   facet_wrap(~sex)
 g
 #ggsave(file.path(result_dir, "abstract_scatter.png"), g)
 ```
 
-```{r}
+```{r Unadjusted}
+# Only a single version from both South Africa and Australia.
 g <- both %>%
   filter(!(str_starts(model_country_id, "SA2") | str_starts(data_country_id, "SA2"))) %>%
   filter(!(str_starts(model_country_id, "AU2") | str_starts(data_country_id, "AU2"))) %>%
-  ggplot(aes(deferral_rate, `AUPR value`, ymin=`AUPR low`, ymax=`AUPR high`, color=model_country, shape=data_country)) +
+  ggplot(aes(deferral_rate, `AUPR value`, ymin=`AUPR low`, ymax=`AUPR high`, color=data_country, shape=model_country)) +
   geom_errorbar(position=position_jitter(width=0.01, height=0, seed=1)) +
   geom_point(position=position_jitter(width=0.01, height=0, seed=1)) +
-  labs(x="Deferral rate", y="Area under PR curve", color="Model country", shape="Data country") +
+  labs(x="Deferral rate", y="Area under PR curve", color="Data country", shape="Model country") +
   facet_wrap(~sex)
 g
 ggsave(file.path(result_dir, "abstract_scatter.png"), g)
 ```
 
+```{r Adjusted}
+# Only a single version from both South Africa and Australia.
+g <- both %>%
+  filter(!(str_starts(model_country_id, "SA2") | str_starts(data_country_id, "SA2"))) %>%
+  filter(!(str_starts(model_country_id, "AU2") | str_starts(data_country_id, "AU2"))) %>%
+  mutate(across(starts_with("AUPR"), function(v) {v - deferral_rate})) %>%
+  ggplot(aes(deferral_rate, `AUPR value`, ymin=`AUPR low`, ymax=`AUPR high`, color=data_country, shape=model_country)) +
+  geom_errorbar(position=position_jitter(width=0.01, height=0, seed=1)) +
+  geom_point(position=position_jitter(width=0.01, height=0, seed=1)) +
+  labs(x="Deferral rate", y="Adjusted area under PR curve", color="Data country", shape="Model country") +
+  facet_wrap(~sex)
+g
+```
 
 
 
