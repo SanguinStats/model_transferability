@@ -26,7 +26,7 @@ library(tidyverse)
 ```
 
 ```{r load models and data}
-path <- "C:/Users/meule01a/OneDrive - Sanquin/A4 Project SanguinStats (OD)/07 Resultaten/20230301 SanguinStats results overview/results/"
+path <- "C:/Users/meule01a/OneDrive - Sanquin/A4 Project SanguinStats (OD)/07 Resultaten/results/"
 folders <- list.dirs(path, full.names=FALSE, recursive=FALSE)
 
 datalist <- lapply(folders, load_files, target_name='/sizes.csv')
@@ -39,18 +39,20 @@ data_sizes <- bind_rows(datalist) %>%
   separate(
       Id, into=c(NA, 'sex'), sep='-') %>%
   distinct() %>%
-  mutate(deferral_rate = Deferred.last.donations / Donors,
-         modelcountry = case_when(modelcountry=='BE' ~ 'Belgium',
+  mutate(deferral_rate = Deferred.last.donations / Donors, modelcountry = case_when(modelcountry=='BE' ~ 'Belgium',
                              modelcountry=='NL' ~ 'Netherlands',
                              modelcountry=='FI' ~ 'Finland',
-                             modelcountry=='SA' ~ 'South Africa',
-                             modelcountry=='AU' ~ 'Australia'),
+                             modelcountry=='SA' ~ 'South Africa (EU cut off)',
+                             modelcountry=='SA2' ~ 'South Africa (Own cut off)',
+                             modelcountry=='AU' ~ 'Australia (Own cut off)', 
+                             modelcountry=='AU2' ~ 'Australia (EU cut off)'),
          datacountry = case_when(datacountry=='BE' ~ 'Belgium',
                              datacountry=='NL' ~ 'Netherlands',
                              datacountry=='FI' ~ 'Finland',
-                             datacountry=='SA' ~ 'South Africa',
-                             datacountry=='AU' ~ 'Australia')) %>%
-  
+                             datacountry=='SA' ~ 'South Africa (EU cut off)',
+                             datacountry=='AU' ~ 'Australia (Own cut off)',
+                             datacountry=='AU2' ~ 'Australia (EU cut off)',
+                             datacountry=='SA2'~ 'South Africa (Own cut off)')) %>%
   select(model, datacountry, modelcountry, sex, label, deferral_rate) %>%
   pivot_wider(names_from=label, names_prefix='defrate_', values_from=deferral_rate)
 
@@ -61,13 +63,17 @@ data <- bind_rows(datalist) %>%
   mutate(modelcountry = case_when(modelcountry=='BE' ~ 'Belgium',
                              modelcountry=='NL' ~ 'Netherlands',
                              modelcountry=='FI' ~ 'Finland',
-                             modelcountry=='SA' ~ 'South Africa',
-                             modelcountry=='AU' ~ 'Australia'),
+                             modelcountry=='SA' ~ 'South Africa (EU cut off)',
+                             modelcountry=='SA2' ~ 'South Africa (Own cut off)',
+                             modelcountry=='AU' ~ 'Australia (Own cut off)', 
+                             modelcountry=='AU2' ~ 'Australia (EU cut off)'),
          datacountry = case_when(datacountry=='BE' ~ 'Belgium',
                              datacountry=='NL' ~ 'Netherlands',
                              datacountry=='FI' ~ 'Finland',
-                             datacountry=='SA' ~ 'South Africa',
-                             datacountry=='AU' ~ 'Australia')) %>%
+                             datacountry=='SA' ~ 'South Africa (EU cut off)',
+                             datacountry=='AU' ~ 'Australia (Own cut off)',
+                             datacountry=='AU2' ~ 'Australia (EU cut off)',
+                             datacountry=='SA2'~ 'South Africa (Own cut off)')) %>%
          #sex = as.factor(Sex)) %>%
   merge(data_sizes, by=c('model', 'sex', 'datacountry', 'modelcountry'), all.x=TRUE) %>%
   mutate(AUPR.value = (AUPR.value - defrate_validate),
@@ -81,12 +87,15 @@ data <- bind_rows(datalist) %>%
 
 ```{r make figures}
 currentDate <- format(Sys.time(), "%Y-%m-%d")
-FolderName <- paste("C:/Users/meule01a/OneDrive - Sanquin/A4 Project SanguinStats (OD)/07 Resultaten/20230301 SanguinStats results overview/figures/", currentDate,sep="")
+FolderName <- paste("C:/Users/meule01a/OneDrive - Sanquin/A4 Project SanguinStats (OD)/07 Resultaten/figures/", currentDate,sep="")
 dir.create(FolderName)
 
-countries <- c("Netherlands","Finland","South Africa","Australia", "Belgium")
-countries <- c("Netherlands","Finland","South Africa","Australia") #selected only finland and NL because we only ran models on these data
+FolderName <- paste("C:/Users/meule01a/OneDrive - Sanquin/A4 Project SanguinStats (OD)/07 Resultaten/figures/", currentDate,"/ModelPerformance",sep="")
+dir.create(FolderName)
 
+
+countries <- c("Netherlands","Finland","South Africa (Own cut off)", "South Africa (EU cut off)","Australia (Own cut off)", "Australia (EU cut off)", "Belgium")
+            
 df <- data %>% select(model, sex,datacountry,modelcountry, matches("^F1|^AUROC|AUPR")) %>%
   pivot_longer(-c(model, sex,datacountry,modelcountry)) %>%
   separate(name, c("metric", "type"), sep=" ") %>%
@@ -104,7 +113,7 @@ for (i in 1:length(countries)){
              color = modelcountry)) +
   
   guides(color = guide_legend(reverse = TRUE))+ #reverses the order of the legend, because apparently it is not displayed in the same order as the countries in the plot
-  geom_pointrange(position = position_dodge(width= 0.6)) +
+  geom_pointrange(position = position_dodge(width= 0.6), size = 0.35, fatten = 0.8) +
   labs(title=paste0("Data from ", countries[i], sep=""),  
        #shape = "Data from",
        color = "Model trained in") +
@@ -113,7 +122,7 @@ for (i in 1:length(countries)){
   facet_grid(metric ~ sex)
 
 FileName <- paste(FolderName, "/Modelperformance_Data", countries[i] ,".png",sep="")
-ggsave(FileName)
+ggsave(FileName, width = 9, height = 9)
 }
 
 ```

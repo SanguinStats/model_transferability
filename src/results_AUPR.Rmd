@@ -94,8 +94,7 @@ FolderName <- paste("C:/Users/meule01a/OneDrive - Sanquin/A4 Project SanguinStat
 dir.create(FolderName)
 
 countries <- c("Netherlands","Finland","South Africa (Own cut off)", "South Africa (EU cut off)","Australia (Own cut off)", "Australia (EU cut off)", "Belgium")
-countries <- c("Netherlands","Finland","Australia (Own cut off)", "Australia (EU cut off)", "Belgium")
-
+               
 dfadj <- data %>% select(model, sex,datacountry,modelcountry, matches("AUPRadj")) %>%
   pivot_longer(-c(model, sex,datacountry,modelcountry)) %>%
   separate(name, c("metric", "type"), sep=" ") %>%
