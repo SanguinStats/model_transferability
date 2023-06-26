@@ -1,0 +1,106 @@
+---
+title: "Model transferability"
+author: "Amber Meulenbeld"
+date: "2023-06-26"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+load_files <- function(folder, target_name) {
+  info <- str_split(folder, '-', simplify=TRUE)       # country, size
+  file <- paste0(path, folder, target_name)
+  data <- read.csv(file) %>%
+    mutate(model = info[1],
+           modelcountry = info[2],
+           datacountry = info[3])
+  return(data)
+}
+```
+
+## R Markdown
+
+```{r setup}
+library(tidyverse)
+library("PRROC")
+library(dplyr)
+library(cowplot)
+```
+
+```{r load models and data}
+path <- "~/Amber/SanguinStats/Resultaten/results/"
+folders <- list.dirs(path, full.names=FALSE, recursive=FALSE)
+
+datalist <- lapply(folders, load_files, target_name='/prediction.csv')
+
+for(i in 1:length(datalist)){
+  colnames(datalist[[i]])[1] <- "Id"
+}
+
+data <- bind_rows(datalist)
+```
+
+
+
+```{r init lists}
+
+geslacht <- c("male", "female")
+
+countries_short<-c("NL", "FI", "SA2", "SA", "AU", "AU2", "BE")
+
+countries <- c("Netherlands","Finland","South Africa (Own cut off)", "South Africa (EU cut off)","Australia (Own cut off)", "Australia (EU cut off)", "Belgium")
+models <- c("Model1", "Model2", "Model3")
+
+for(i in 1:length(countries)){
+  for(j in 1:length(models))
+  eval(parse(text = paste0(countries_short[i],"_",models[j],"<<- data %>% filter(datacountry==\"",countries_short[i],"\"& model == \"", models[j], "\")")))
+}
+
+```
+
+```{r make AUPR curves}
+for(i in 1:length(countries_short)){
+  for(j in 1:length(models)){
+    for(k in 1:length(countries_short)){
+      eval(parse(text=paste0("pra",k,"<-pr.curve(scores.class0=",countries_short[i],"_",models[j],"$predicted_label[",countries_short[i],"_",models[j],"$sex==geslacht[1] &",countries_short[i],"_",models[j],"$modelcountry==\"", countries_short[k],"\"], weights.class0=",countries_short[i],"_",models[j],"$original_label[",countries_short[i],"_",models[j],"$sex==geslacht[1]&",countries_short[i],"_",models[j],"$modelcountry==\"", countries_short[k],"\"],curve=T)")))
+      eval(parse(text = paste0("a", k, "<<- as.data.frame(pra", k, "$curve) %>% mutate(modelcountry=\"",countries_short[k],"\", sex=geslacht[1], model =\"", models[j],"\")"))) 
+            eval(parse(text=paste0("prb",k,"<-pr.curve(scores.class0=",countries_short[i],"_",models[j],"$predicted_label[",countries_short[i],"_",models[j],"$sex==geslacht[2] &",countries_short[i],"_",models[j],"$modelcountry==\"", countries_short[k],"\"], weights.class0=",countries_short[i],"_",models[j],"$original_label[",countries_short[i],"_",models[j],"$sex==geslacht[2]&",countries_short[i],"_",models[j],"$modelcountry==\"", countries_short[k],"\"],curve=T)")))
+      eval(parse(text = paste0("b", k, "<<- as.data.frame(prb", k, "$curve) %>% mutate(modelcountry=\"",countries_short[k],"\", sex=geslacht[2], model =\"", models[j],"\")"))) 
+}
+eval(parse(text=paste0("a_",j,"<- rbind(a1,a2,a3,a4,a5,a6,a7)")))
+eval(parse(text=paste0("b_",j," <- rbind(b1, b2, b3, b4, b5, b6, b7)")))
+eval(parse(text = paste0("c",j," <- rbind(a_",j,",b_",j,") %>% mutate(modelcountry = case_when(modelcountry=='BE' ~ 'Belgium',modelcountry=='NL' ~ 'Netherlands',modelcountry=='FI' ~ 'Finland',modelcountry=='SA' ~ 'South Africa (EU cut off)',modelcountry=='SA2' ~ 'South Africa (Own cut off)',modelcountry=='AU' ~ 'Australia (Own cut off)',modelcountry=='AU2' ~ 'Australia (EU cut off)'))")))
+
+countries <- c("Netherlands","Finland","South Africa (Own cut off)", "South Africa (EU cut off)","Australia (Own cut off)", "Australia (EU cut off)", "Belgium")
+
+
+  }
+eval(parse(text=paste0("c_",countries_short[i]," <- rbind(c1, c2, c3)")))
+
+}
+
+```
+
+```{r make figures}
+
+currentDate <- format(Sys.time(), "%Y-%m-%d")
+FolderName <- paste("~/Amber/SanguinStats/Resultaten/figures/", currentDate,sep="")
+dir.create(FolderName)
+
+FolderName <- paste("~/Amber/SanguinStats/Resultaten/figures/", currentDate,"/AUPR curves",sep="")
+dir.create(FolderName)
+
+for(i in 1:length(countries_short)){
+eval(parse(text=paste0("p <- ggplot(data=c_",countries_short[i],", aes(V1,V2))+geom_line(aes(col=modelcountry))+ylim(0,1)+xlim(0,1)+facet_grid(model~sex) + ggtitle(paste0(\"Data from \", countries[i])) + labs(col = \"Model trained in\") + xlab(\"Recall\") + ylab(\"Precision\") + guides(guide = guide_legend(reverse=T))")))
+ggsave(p, file=paste0(FolderName, "/", countries_short[i],".png", sep = ""), height = 9, width = 9)
+}
+```
+
+
+
+```{r}
+data <- bind_rows(datalist) %>% filter(datacountry == "AU", model == "Model3", sex == "male") %>% mutate(modelcountry = case_when(modelcountry=='BE' ~ 'Belgium',modelcountry=='NL' ~ 'Netherlands',modelcountry=='FI' ~ 'Finland',modelcountry=='SA' ~ 'South Africa (EU cut off)',modelcountry=='SA2' ~ 'South Africa (Own cut off)',modelcountry=='AU' ~ 'Australia (Own cut off)',modelcountry=='AU2' ~ 'Australia (EU cut off)'))
+countries <- c("Netherlands","Finland","South Africa (Own cut off)", "South Africa (EU cut off)","Australia (Own cut off)", "Australia (EU cut off)", "Belgium")
+
+```
