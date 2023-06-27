@@ -82,7 +82,7 @@ data_maa <- data_shap %>%
   group_by(datacountry, model, modelcountry, sex, variable) %>%
   summarise(maa = mean(abs(attribution))) %>%
   ungroup() %>%
-  group_by(model, sex, variable) %>%
+  group_by(datacountry, model, sex, variable) %>%
   mutate(avg_maa = mean(maa)) %>%
   ungroup() %>%
   group_by(variable) %>%
@@ -103,7 +103,7 @@ plot_comp_model <- function(data, datacountryname, modelname) {
       geom_point(mapping=aes(y = maa, color = modelcountry, shape = modelcountry), size = 2) +
       geom_col(mapping=aes(y = avg_maa), alpha = 0.2, position = 'identity') +
       scale_shape_manual(values=c(18, 15, 8, 17, 16, 6, 13)) +
-      coord_flip() + xlab("") + ylab("")+ theme_bw()+
+      coord_flip() + xlab("") + ylab("")+ theme_bw()+ ylim(0,0.175)+
       theme(legend.position="none") 
   return(plt)
 }
