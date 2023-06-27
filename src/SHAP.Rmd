@@ -69,12 +69,12 @@ data_shap <- bind_rows(datalist) %>%
                               Variable=='recent_donations' ~ 'Recent donations',
                               Variable=='warm_season' ~ 'Warm season',
                               Variable=='days_to_previous_Hb' ~ 'Days to previous Hb measurement',
-                              Variable=='days_to_previous_Hb2' ~ 'Days to second-previous Hb measurement',
-                              Variable=='days_to_previous_Hb3' ~ 'Days to third-previous Hb measurement',
-                              Variable=='days_to_previous_Hb4' ~ 'Days to fourth-previous Hb measurement',
-                              Variable=='previous_Hb2' ~ 'Second-previous Hb',
-                              Variable=='previous_Hb3' ~ 'Third-previous Hb',
-                              Variable=='previous_Hb4' ~ 'Fourth-previous Hb'),
+                              Variable=='days_to_previous_Hb2' ~ 'Days to 2nd-previous Hb measurement',
+                              Variable=='days_to_previous_Hb3' ~ 'Days to 3rd-previous Hb measurement',
+                              Variable=='days_to_previous_Hb4' ~ 'Days to 4th-previous Hb measurement',
+                              Variable=='previous_Hb2' ~ '2nd-previous Hb',
+                              Variable=='previous_Hb3' ~ '3rd-previous Hb',
+                              Variable=='previous_Hb4' ~ '4th-previous Hb'),
          sex = as.factor(sex)) %>%
   rename(variable = Variable)  
 
