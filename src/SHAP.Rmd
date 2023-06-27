@@ -1,0 +1,159 @@
+---
+title: "Model transferability"
+author: "Amber Meulenbeld"
+date: "2023-02-16"
+output: html_document
+---
+
+```{r}
+library(readr)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(tidyverse)
+library(cowplot)
+library(ggpubr)
+```
+
+# Functions to load data 
+```{r init}
+load_files <- function(folder, target_name) {
+  info <- str_split(folder, '-', simplify=TRUE)       # country, size
+  file <- paste0(path, folder, target_name)
+  data <- read.csv(file) %>%
+    mutate(model = info[1],
+           modelcountry = info[2],
+           datacountry = info[3])
+  return(data)
+}
+```
+
+# Loading files with SHAP values
+These are all runs on mode 'final'.
+
+```{r load data}
+path <- "~/Amber/SanguinStats/Resultaten/results/"
+folders <- list.dirs(path, full.names=FALSE, recursive=FALSE)
+
+datalist <- lapply(folders, load_files, target_name='/shap-value.csv')
+for(i in 1:length(datalist)){
+  colnames(datalist[[i]])[1] <- "Id"
+}
+
+data_shap <- bind_rows(datalist) %>%
+  separate(Id, into=c('type', 'sex'), sep='-') %>%
+  filter(Variable != 'sex')%>%
+  filter(!is.na(value))%>%
+  mutate(modelcountry = case_when(modelcountry=='BE' ~ 'Belgium',
+                             modelcountry=='NL' ~ 'Netherlands',
+                             modelcountry=='FI' ~ 'Finland',
+                             modelcountry=='SA' ~ 'South Africa (EU cut off)',
+                             modelcountry=='SA2' ~ 'South Africa (Own cut off)',
+                             modelcountry=='AU' ~ 'Australia (Own cut off)', 
+                             modelcountry=='AU2' ~ 'Australia (EU cut off)'),
+         datacountry = case_when(datacountry=='BE' ~ 'Belgium',
+                             datacountry=='NL' ~ 'Netherlands',
+                             datacountry=='FI' ~ 'Finland',
+                             datacountry=='SA' ~ 'South Africa (EU cut off)',
+                             datacountry=='AU' ~ 'Australia (Own cut off)',
+                             datacountry=='AU2' ~ 'Australia (EU cut off)',
+                             datacountry=='SA2'~ 'South Africa (Own cut off)'),
+         Variable = case_when(Variable=='age' ~ 'Age',
+                              Variable=='consecutive_deferrals' ~ 'Consecutive deferrals',
+                              Variable=='days_to_previous_fb' ~ 'Days to previous whole blood donation',
+                              Variable=='Hb_first' ~ 'First Hb',
+                              Variable=='hour' ~ 'Time',
+                              Variable=='previous_Hb' ~ 'Previous Hb',
+                              Variable=='previous_Hb_def' ~ 'Previous visit low Hb',
+                              Variable=='recent_deferrals' ~ 'Recent low Hb',
+                              Variable=='recent_donations' ~ 'Recent donations',
+                              Variable=='warm_season' ~ 'Warm season',
+                              Variable=='days_to_previous_Hb' ~ 'Days to previous Hb measurement',
+                              Variable=='days_to_previous_Hb2' ~ 'Days to second-previous Hb measurement',
+                              Variable=='days_to_previous_Hb3' ~ 'Days to third-previous Hb measurement',
+                              Variable=='days_to_previous_Hb4' ~ 'Days to fourth-previous Hb measurement',
+                              Variable=='previous_Hb2' ~ 'Second-previous Hb',
+                              Variable=='previous_Hb3' ~ 'Third-previous Hb',
+                              Variable=='previous_Hb4' ~ 'Fourth-previous Hb'),
+         sex = as.factor(sex)) %>%
+  rename(variable = Variable)  
+
+data_maa <- data_shap %>%
+  group_by(datacountry, model, modelcountry, sex, variable) %>%
+  summarise(maa = mean(abs(attribution))) %>%
+  ungroup() %>%
+  group_by(model, sex, variable) %>%
+  mutate(avg_maa = mean(maa)) %>%
+  ungroup() %>%
+  group_by(variable) %>%
+  mutate(avg_avg_maa = mean(maa)) %>%
+  ungroup()
+  
+```
+
+Dataframes per model
+
+```{r plot function}
+plot_comp_model <- function(data, datacountryname, modelname) {
+  data_plt <- data %>%
+    filter(datacountry == datacountryname & model == modelname)
+  plt <- ggplot(data=data_plt, aes(x = reorder(variable, avg_maa))) +
+      facet_grid(model~sex) +
+      geom_line(mapping=aes(y = maa, group = modelcountry, color = modelcountry), size = 1) +
+      geom_point(mapping=aes(y = maa, color = modelcountry, shape = modelcountry), size = 2) +
+      geom_col(mapping=aes(y = avg_maa), alpha = 0.2, position = 'identity') +
+      scale_shape_manual(values=c(18, 15, 8, 17, 16, 6, 13)) +
+      coord_flip() + xlab("") + ylab("")+ theme_bw()+
+      theme(legend.position="none") 
+  return(plt)
+}
+
+plot_comp_model_legend <- function(data, datacountryname, modelname) {
+  data_plt <- data %>%
+    filter(datacountry == datacountryname & model == modelname)
+  plt <- ggplot(data=data_plt, aes(x = reorder(variable, avg_maa))) +
+      facet_grid(model~sex) +
+      geom_line(mapping=aes(y = maa, group = modelcountry, color = modelcountry), size = 1) +
+      geom_point(mapping=aes(y = maa, color = modelcountry, shape = modelcountry), size = 2) +
+      geom_col(mapping=aes(y = avg_maa), alpha = 0.2, position = 'identity') +
+      scale_shape_manual(values=c(18, 15, 8, 17, 16, 6, 13)) +
+      coord_flip() + xlab("") + ylab("")+ theme_bw()+
+      labs(color = "Model from", shape = "Model from")
+  return(plt)
+}
+
+```
+
+```{r list init}
+countries <- c("Netherlands","Finland","South Africa (Own cut off)", "South Africa (EU cut off)","Australia (Own cut off)", "Australia (EU cut off)", "Belgium")
+countries_short<-c("NL", "FI", "SA2", "SA", "AU", "AU2", "BE")
+models <- c("Model1", "Model2", "Model3","Model2")
+```
+
+```{r make plot}
+currentDate <- format(Sys.time(), "%Y-%m-%d")
+FolderName <- paste("~/Amber/SanguinStats/Resultaten/figures/", currentDate,sep="")
+dir.create(FolderName)
+
+FolderName <- paste("~/Amber/SanguinStats/Resultaten/figures/", currentDate,"/SHAP",sep="")
+dir.create(FolderName)
+
+for(i in 1:length(countries)){
+p1 <-plot_comp_model(data_maa, countries[i], models[1])
+p2 <- plot_comp_model(data_maa, countries[i], models[2])
+p3 <- plot_comp_model(data_maa, countries[i], models[3])
+p4 <- plot_comp_model_legend(data_maa, countries[i], models[2])
+legend <- get_legend(p4)
+figure <- plot_grid(plot_grid(p1, p2, p3, nrow=3, ncol=1), plot_grid(NULL, legend, NULL, nrow=3, ncol=1), rel_widths=c(1, 0.2))
+if(countries[i]=="Netherlands"){annotate_figure <- annotate_figure(figure, 
+                                   top = text_grob(paste0("Variable importance, data from the ", countries[i]), color = "black", size = 14),
+                                   bottom = text_grob("Mean absolute attribution", color = "black", size = 12))} else{
+                                     annotate_figure <- annotate_figure(figure, 
+                                   top = text_grob(paste0("Variable importance, data from ", countries[i]), color = "black", size = 14),
+                                   bottom = text_grob("Mean absolute attribution", color = "black", size = 12))
+                                   }
+ggsave(annotate_figure, file = paste0(FolderName, "/", countries_short[i], "_shap.jpg"), height = 9, width = 13)
+
+}
+
+```
