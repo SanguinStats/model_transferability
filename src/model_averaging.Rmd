@@ -15,23 +15,24 @@ library(boot)
 base_dir <- "~/FRCBS/Hb_predictor_container/results"
 fsummary <- function(df) df %>% mutate(across(where(is.character), as.factor)) %>% summary()
 countries <- c("Australia", "Belgium", "Finland", "Netherlands", "South-Africa", "Average") 
+countries2 <- sort(c(countries, "Australia2", "South-Africa2"))
 result_path <- "../results"
 fig_path <- file.path(result_path, "figures")
 ```
 
 ## TODO
 
-- Find out why Belgian 5don4hb model has different data than in other countries.
+- Find out why Belgian 5don4hb model has different data than in other countries. [DONE] The rows of file
+  prediction.csv are permuted.
 
 ## Get Finnish data
 
-These are not used yet.
 
 In the container, just before fitting the (random forest) model the train and validation data sets are saved to files,
 e.g. `/tmp/rf-validate-male.rds`. Before the container is killed, these files can be copies out with the `docker cp` command,
 e.g. `docker cp kind_brahmagupta:/tmp/rf-validate-male.rds .`, where `kind_brahmagupta` is the name of the container.
 
-```{r}
+```{r Get Finnish datas}
 validate_subdirectories <- tribble(
   ~Data_country, ~Model, ~Subdirectory,
   "Finland", "2don", "jarkko-2023-03-28-get-data-Australia_2don",
@@ -46,7 +47,84 @@ validate_datas <- validate_subdirectories %>%
 ```
 
 
+```{r Where the fitted models are stored}
+models <- tribble(~Model_country, ~Model, ~dir, ~file,
+                  "Finland", "2don", "jarkko-2023-01-17-model1-l-2" ,"svm-and-rf-models.zip",
+                  "Finland", "5don", "jarkko-2023-01-17-model2-l-5" ,"svm-and-rf-models.zip",
+                  "Finland", "5don4hb", "jarkko-2023-01-17-model3-l-5-hb4" ,"svm-and-rf-models.zip",
+"Netherlands", "2don", "amber-2023-01-31", "svm-and-rf-models-2don.zip",
+"Netherlands", "5don", "amber-2023-01-31", "svm-and-rf-models-5don.zip",
+"Netherlands", "5don4hb", "amber-2023-01-31", "svm-and-rf-models-5don4hb.zip",
+"Australia", "2don", "australia-2023-02-24", "svm-and-rf-models_Australia_2don.zip",
+"Australia", "5don", "australia-2023-02-24", "svm-and-rf-models_Australia_5don.zip",
+"Australia", "5don4hb", "australia-2023-02-24", "svm-and-rf-models_Australia_5don4hb.zip",
+"South-Africa", "2don", "south-africa-2023-02-28", "svm-and-rf-models_South_Africa_2don.zip",
+"South-Africa", "5don", "south-africa-2023-02-28", "svm-and-rf-models_South_Africa_5don.zip",
+"South-Africa", "5don4hb", "south-africa-2023-02-28", "svm-and-rf-models_South_Africa_5don4hb.zip",
+"Belgium", "2don", "belgium-2023-03-24", "svm-and-rf-models_Belgium_2don.zip",
+"Belgium", "5don", "belgium-2023-03-24", "svm-and-rf-models_Belgium_5don.zip",
+"Belgium", "5don4hb", "belgium-2023-03-24", "svm-and-rf-models_Belgium_5don4hb.zip",
+"Australia2", "2don", "australia-2023-03-28-unified_threshold", "svm-and-rf-models_Australia_2don.zip",
+"Australia2", "5don", "australia-2023-03-28-unified_threshold", "svm-and-rf-models_Australia_5don.zip",
+"Australia2", "5don4hb", "australia-2023-03-28-unified_threshold", "svm-and-rf-models_Australia_5don4hb.zip",
+"South-Africa2", "2don", "south-africa-2023-04-05-unified_threshold", "svm-and-rf-models_South_Africa_2don_Own.zip",
+"South-Africa2", "5don", "south-africa-2023-04-05-unified_threshold", "svm-and-rf-models_South_Africa_5don_Own.zip",
+"South-Africa2", "5don4hb", "south-africa-2023-04-05-unified_threshold", "svm-and-rf-models_South_Africa_5don4hb_Own.zip"
+)
+models <- models %>% 
+  mutate(filename=file.path(base_dir, dir, file))
+```
+
+```{r Function to read the models}
+helper <- function(zipfilename) {
+  temp_dir <- tempdir()
+  cmd <- sprintf("unzip -o %s -d %s", zipfilename, temp_dir)
+  print(cmd)
+  system(cmd)
+  male_model <- readRDS(sprintf("%s/rf-fit-male.rds", temp_dir))
+  female_model <- readRDS(sprintf("%s/rf-fit-female.rds", temp_dir))
+  tibble(sex=c("male", "female"), fit=list(male_model, female_model))
+}
+```
+
+```{r Read the models}
+models <- models %>% 
+  mutate(fit = map(filename, helper)) %>%
+  unnest(fit)
+```
+
+```{r Function that predicts on new data}
+helper2 <- function(fit, validate) {
+  p <- predict(fit, newdata=validate)
+  score <- predict(fit, newdata = validate, type = "prob")[,"Deferred"]
+  # sex   original_label predicted_label  score f1_threshold score_predicted_label original_value predicted_value
+  result <- validate %>% 
+    mutate(original_label = as.integer(Hb_deferral=="Deferred"),
+           predicted_label = as.integer(p == "Deferred"),
+           score = score,
+           f1_threshold = NA,
+           score_predicted_label = NA,
+           original_value = Hb,
+           predicted_value = NA,
+           n=1:n()
+    ) %>%
+    select(sex, original_label, predicted_label, score, f1_threshold, score_predicted_label, 
+           original_value, predicted_value, n)
+  result
+}
+```
+
+```{r Compute the predictions}
+recomputed_datas <- validate_datas %>% 
+  select(Data_country, Model, sex, validate=df) %>%
+  full_join(models %>% select(Model_country, Model, sex, fit))
+recomputed_datas <- recomputed_datas %>%
+  mutate(df = map2(fit, validate, helper2))
+```
+
 ## Get the deferral probabilities from the result files
+
+This uses still the old way of using the prediction.csv files outputted by the container.
 
 ```{r}
 subdirectories <- tribble(
@@ -72,6 +150,7 @@ subdirectories <- tribble(
 
 Get the predictions. Note that it is not obvious that the same observation are sampled and that they are in the same order. For instance, here the results from the Belgian 5don4hb model doesn't seem to match the results from the other models. It would be
 better to fix the data set and predict the observations again with different models using the fixed data.
+In file docker-apps-plumber.R I permute the rows of the prediction.csv file, hence the mismatch of the rows.
 
 ```{r}
 datas2 <- subdirectories %>%
@@ -88,6 +167,8 @@ Check that all result files have same number of rows.
 
 ```{r}
 map_int(datas$df, nrow)
+number_of_observations <- datas %>% pluck("df", 1) %>% nrow() / 2
+number_of_observations
 ```
 
 Sample size was 10 000 and the validate set size was 1600. This number of observations are available for both sexes, hence 3200.
@@ -303,20 +384,26 @@ filename <- file.path(fig_path, "model_average_finnish_data_aupr.png")
 
 How often models predict each label?
 
-```{r}
-df_with_pred <- df2 %>% 
-  mutate(predicted_label = as.integer(score >= 0.5))
-df_with_pred %>% select(Model_country, predicted_label, sex, Model) %>% table()
-```
 
 ```{r}
-cooccurrence <- df_with_pred %>% 
-  #filter(Model=="2don", sex=="female") %>% 
+# df_with_pred <- df2 %>% 
+#   mutate(predicted_label = as.integer(score >= 0.5))
+df_with_pred2 <- recomputed_datas %>% select(-sex) %>% unnest(df)
+df_with_pred2 <- df_with_pred2 %>% select(-c(validate, fit))
+df_with_pred2 %>% select(Model_country, predicted_label, sex, Model) %>% table()
+```
+
+### Identically predicted labels
+
+```{r}
+cooccurrence <- df_with_pred2 %>% 
   group_by(Model, sex, n, predicted_label) %>%
   summarise(x = list(expand.grid(Model_country, Model_country)), .groups="drop") %>% 
   unnest(x) %>% 
   count(Model, sex, Var1, Var2) %>%
-  mutate(across(c("Var1", "Var2"), function(x) fct_relevel(x, countries)))
+  mutate(across(c("Var1", "Var2"), 
+                function(x) fct_relevel(x, setdiff(countries2, "Average")))
+  )
 ```
 
 
@@ -335,8 +422,51 @@ cooccurrence %>%
         legend.text = element_text(angle = 45, vjust=1, hjust=1))
 ```
 
+### True predicted deferrals
+
 ```{r}
-df_with_pred %>%
+cooccurrence2 <- df_with_pred2 %>% 
+  filter(Model_country != "Average",
+         original_label == 1,
+         predicted_label == 1) %>% 
+  group_by(Model, sex, n) %>%
+  summarise(x = list(expand.grid(Model_country, Model_country)), .groups="drop") %>% 
+  unnest(x) %>% 
+  count(Model, sex, Var1, Var2) %>%
+  mutate(across(c("Var1", "Var2"), function(x) fct_relevel(x, setdiff(countries2, "Average"))))
+```
+
+
+```{r}
+number_of_deferrals <- df_with_pred2 %>% 
+  group_by(sex, Model, Model_country) %>% summarise(deferrals = sum(original_label), .groups="drop") %>%
+  select(-Model_country) %>%
+  distinct()
+# There is some aligment/NA problem in geom_raster, hence I explicitly insert one NA cell.
+#tmp <- expand_grid(Model="5don4hb", sex=c("female", "male"), Var1=factor("Belgium"), Var2=factor("Belgium"), n=NA)
+g <- cooccurrence2 %>%
+  #bind_rows(tmp) %>%
+  left_join(number_of_deferrals, by=c("sex", "Model")) %>%
+  mutate(percentage = 100*n/deferrals) %>%
+  #filter(Var1 != "Average" & Var2 != "Average") %>%
+  mutate(Var2 = fct_rev(Var2)) %>%
+  ggplot(aes(x=Var1, y=Var2, fill=percentage)) + 
+  geom_raster(na.rm=TRUE) +
+  geom_text(aes(label=n), color="white", size=3, na.rm=TRUE) +
+  labs(x="Model country", y="Model country", title="Number of observations both countries consider as true positives", 
+       subtitle=sprintf("Finnish data, n=%i", number_of_observations), 
+       fill="Percentage of deferrals predicted correctly") +
+  facet_grid(sex ~ Model) +
+  theme(legend.position="bottom",
+        axis.text.x = element_text(angle = 45, vjust=1, hjust=1),
+        legend.text = element_text(angle = 45, vjust=1, hjust=1))
+g
+ggsave(sprintf("%s/cooccurrences-of-true-positives.pdf", fig_path), g)
+```
+
+
+```{r}
+df_with_pred2 %>%
   filter(!(sex == "male" & original_value < 125)) %>%
   filter(Model_country != "Average") %>%
   ggplot(aes(original_value, score, color=Model_country)) +
