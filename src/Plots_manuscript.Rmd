@@ -297,7 +297,7 @@ data_maa <- data_shap %>%
       geom_point(mapping=aes(y = maa, color = modelcountry, shape = modelcountry), size = 2) +
       geom_col(mapping=aes(y = avg_maa), alpha = 0.2, position = 'identity') +
       scale_shape_manual(values=c(18, 15, 8, 17, 16, 6, 13)) +
-      coord_flip() + xlab("Mean absolute attribution") + ylab("Variable")+ theme_bw()+ ggtitle("Variable importance in different models on datasets from various countries")+
+      coord_flip() + xlab("Variable") + ylab("Mean absolute attribution")+ theme_bw()+ ggtitle("Variable importance in different models on datasets from various countries")+
       labs(color = "Model from", shape = "Model from") + theme(axis.text.x=element_text(size=8))
 
 ggsave(plt, file = paste0(FolderName, "/SHAP.jpg"), height = 13, width = 13)
