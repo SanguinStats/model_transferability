@@ -1,0 +1,304 @@
+---
+title: "Model transferability (AUPR)"
+author: "A. Meulenbeld"
+date: "09-08-2023"
+output: html_document
+---
+
+# Initialize 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+load_files <- function(folder, target_name) {
+  info <- str_split(folder, '-', simplify=TRUE)       # country, size
+  file <- paste0(path, folder, target_name)
+  data <- read.csv(file) %>%
+    mutate(model = info[1],
+           modelcountry = info[2],
+           datacountry = info[3])
+  return(data)
+}
+```
+
+```{r setup}
+library(tidyverse)
+library("PRROC")
+library(dplyr)
+library(cowplot)
+library(ROCR)
+library(readr)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(cowplot)
+library(ggpubr)
+```
+
+# Sizes and summary data
+
+```{r load sizes and summaries}
+path <- "~/Amber/SanguinStats/Resultaten/results/"
+folders <- list.dirs(path, full.names=FALSE, recursive=FALSE)
+folders <- folders[grepl("Model3", folders)] #select only model 3 from the list with all model runs 
+
+datalist <- lapply(folders, load_files, target_name='/sizes.csv')
+
+for(i in 1:length(datalist)){
+  colnames(datalist[[i]])[1] <- "Id"
+}
+
+data_sizes <- bind_rows(datalist) %>%
+  separate(
+      Id, into=c(NA, 'sex'), sep='-') %>%
+  distinct() %>%
+  mutate(deferral_rate = Deferred.last.donations / Donors, modelcountry = factor(modelcountry, levels=c("AU", "AU2", "BE", "FI", "NL", "SA2", "SA")),datacountry = factor(datacountry, levels=c("AU", "AU2", "BE", "FI", "NL", "SA2", "SA")),
+         modelcountry = case_when(modelcountry=='BE' ~ 'Belgium',
+                             modelcountry=='NL' ~ 'Netherlands',
+                             modelcountry=='FI' ~ 'Finland',
+                             modelcountry=='SA' ~ 'South Africa (EU cut off)',
+                             modelcountry=='SA2' ~ 'South Africa (Own cut off)',
+                             modelcountry=='AU' ~ 'Australia (Own cut off)', 
+                             modelcountry=='AU2' ~ 'Australia (EU cut off)'),
+         datacountry = case_when(datacountry=='BE' ~ 'Belgium',
+                             datacountry=='NL' ~ 'Netherlands',
+                             datacountry=='FI' ~ 'Finland',
+                             datacountry=='SA' ~ 'South Africa (EU cut off)',
+                             datacountry=='AU' ~ 'Australia (Own cut off)',
+                             datacountry=='AU2' ~ 'Australia (EU cut off)',
+                             datacountry=='SA2'~ 'South Africa (Own cut off)')) %>%
+  
+  select(model, datacountry, modelcountry, sex, label, deferral_rate) %>%
+  pivot_wider(names_from=label, names_prefix='defrate_', values_from=deferral_rate)
+
+datalist <- lapply(folders, load_files, target_name='/summary.csv')
+data <- bind_rows(datalist) %>%
+  select(modelcountry, datacountry, Sex, AUPR.value, AUPR.low, AUPR.high, model) %>%
+  rename("sex"="Sex")%>%
+  mutate(modelcountry = factor(modelcountry, levels=c("AU", "AU2", "BE", "FI", "NL", "SA2", "SA")),datacountry = factor(datacountry, levels=c("AU", "AU2", "BE", "FI", "NL", "SA2", "SA")),modelcountry = case_when(modelcountry=='BE' ~ 'Belgium',modelcountry=='NL' ~ 'Netherlands',
+                             modelcountry=='FI' ~ 'Finland',
+                             modelcountry=='SA' ~ 'South Africa (EU cut off)',
+                             modelcountry=='SA2' ~ 'South Africa (Own cut off)',
+                             modelcountry=='AU' ~ 'Australia (Own cut off)', 
+                             modelcountry=='AU2' ~ 'Australia (EU cut off)'),
+         datacountry = case_when(datacountry=='BE' ~ 'Belgium',
+                             datacountry=='NL' ~ 'Netherlands',
+                             datacountry=='FI' ~ 'Finland',
+                             datacountry=='SA' ~ 'South Africa (EU cut off)',
+                             datacountry=='AU' ~ 'Australia (Own cut off)',
+                             datacountry=='AU2' ~ 'Australia (EU cut off)',
+                             datacountry=='SA2'~ 'South Africa (Own cut off)')) %>%
+         #sex = as.factor(Sex)) %>%
+  merge(data_sizes, by=c('model', 'sex', 'datacountry', 'modelcountry'), all.x=TRUE) %>%
+  mutate(AUPRadj.value = (AUPR.value - defrate_validate),
+         AUPRadj.low   = AUPR.low - defrate_validate,
+         AUPRadj.high  = AUPR.high  - defrate_validate)%>%
+  select(-defrate_train, -defrate_test, -defrate_validate)%>%
+  rename("AUPR value"="AUPR.value","AUPR low"="AUPR.low","AUPR high"="AUPR.high","AUPRadj value"="AUPRadj.value","AUPRadj low"="AUPRadj.low","AUPRadj high"="AUPRadj.high")
+```
+
+# AUPR forest plots
+
+```{r make figures}
+currentDate <- format(Sys.time(), "%Y-%m-%d")
+folderpath <- "~/Amber/SanguinStats/Resultaten/figures/"
+FolderName <- paste(folderpath, currentDate,sep="")
+dir.create(FolderName)
+
+FolderName <- paste("~/Amber/SanguinStats/Resultaten/figures/", currentDate,"/manuscript_plots",sep="")
+dir.create(FolderName)
+
+countries <- c("Netherlands","Finland","South Africa (Own cut off)", "South Africa (EU cut off)","Australia (Own cut off)", "Australia (EU cut off)", "Belgium")
+               
+dfadj <- data %>% select(model,sex,datacountry,modelcountry, matches("AUPRadj")) %>%
+  pivot_longer(-c(model, sex,datacountry,modelcountry)) %>%
+  separate(name, c("metric", "type"), sep=" ") %>%
+  pivot_wider(names_from="type") %>%  mutate(modelcountry = fct_relevel(modelcountry, "Australia (EU cut off)","Australia (Own cut off)","Belgium","Finland","Netherlands","South Africa (EU cut off)", "South Africa (Own cut off)"))
+
+datacountry.labs <- c("Data from \n the Netherlands","Data from \n Finland","Data from \n South Africa \n(Own cut off)", "Data from \n South Africa \n(EU cut off)","Data from \n Australia \n(Own cut off)", "Data from \n Australia \n(EU cut off)", "Data from \n Belgium")
+names(datacountry.labs) <- c("Netherlands","Finland","South Africa (Own cut off)", "South Africa (EU cut off)","Australia (Own cut off)", "Australia (EU cut off)", "Belgium")
+
+sex.labs <- c("Males", "Females")
+names(sex.labs) <- c("male", "female")
+
+aupradjplot <- ggplot(dfadj, aes(x=value, 
+             xmin=low, 
+             xmax=high, 
+             y = modelcountry,
+             color = modelcountry)) +
+  geom_pointrange(position = position_dodge(width= 0.6), size = 0.35, fatten = 0.8) +
+  labs(title="Model performance by dataset and country models were trained in",
+       color = "Model trained in") +
+  coord_cartesian(xlim=c(0, 1)) + 
+  facet_grid(datacountry ~ sex, labeller = labeller(datacountry = datacountry.labs, sex = sex.labs)) + xlab("AUPR adjusted for deferral rate") + ylab("Model trained in") + theme(legend.position = "none")+scale_y_discrete(limits = rev(levels(dfadj$modelcountry)))
+
+FileName <- paste(FolderName, "/AUPRadj_forestplot.png",sep="")
+ggsave(aupradjplot, file = FileName, width = 9, height = 9)
+
+
+
+df <- data %>% select(sex,datacountry,modelcountry, matches("AUPR ")) %>%
+  pivot_longer(-c(sex,datacountry,modelcountry)) %>%
+  separate(name, c("metric", "type"), sep=" ") %>%
+  pivot_wider(names_from="type")%>%  mutate(modelcountry = fct_relevel(modelcountry, "Australia (EU cut off)","Australia (Own cut off)","Belgium","Finland","Netherlands","South Africa (EU cut off)", "South Africa (Own cut off)"))
+
+auprplot<-  ggplot(df, aes(x=value, 
+             xmin=low, 
+             xmax=high, 
+             y= modelcountry, 
+             color = modelcountry)) +
+  geom_pointrange(position = position_dodge(width= 0.6), size = 0.35, fatten = 0.8) +
+  labs(title="Model performance by dataset and country models were trained in",
+       color = "Model trained in") +
+  coord_cartesian(xlim=c(0, 1)) + 
+  facet_grid(datacountry ~ sex, labeller = labeller(datacountry = datacountry.labs, sex = sex.labs)) + xlab("AUPR") + ylab("Model trained in") + theme(legend.position = "none") + scale_y_discrete(limits = rev(levels(df$modelcountry)))
+
+FileName <- paste(FolderName, "/AUPR_forestplot.png",sep="")
+ggsave(auprplot, file = FileName, width = 9, height = 9)
+```
+
+# Prediction data
+
+```{r load predictions}
+datalist <- lapply(folders, load_files, target_name='/prediction.csv')
+
+for(i in 1:length(datalist)){
+  colnames(datalist[[i]])[1] <- "Id"
+}
+
+data <- bind_rows(datalist)
+
+geslacht <- c("male", "female")
+
+countries_short<-c("NL", "FI", "SA2", "SA", "AU", "AU2", "BE")
+
+countries <- c("Netherlands","Finland","South Africa (Own cut off)", "South Africa (EU cut off)","Australia (Own cut off)", "Australia (EU cut off)", "Belgium")
+models <- c("Model1", "Model2", "Model3")
+colnames <- c("x", "y", "datacountry", "model", "modelcountry", "sex")
+```
+
+# AUPR curves
+
+```{r make AUPR curves}
+
+aupr.males <- c()
+aupr.females <- c()
+
+for(i in 1:length(countries_short)){
+  for(j in 3:length(models)){
+    for(k in 1:length(countries_short)){
+      eval(parse(text=paste0("pred_male_",k,"<-prediction(data$score[data$datacountry== countries_short[",i,"] & data$model == models[", j,"] & data$modelcountry == countries_short[",k,"] & data$sex==geslacht[1]], data$original_label[data$datacountry== countries_short[",i,"] & data$model == models[", j,"] & data$modelcountry == countries_short[",k,"] & data$sex==geslacht[1]]) ")))
+      eval(parse(text = paste0("perf_male_", k, "<- performance(pred_male_",k,", \"prec\", \"rec\")")))
+      eval(parse(text = paste0("df_male_", k, "<<- data.frame(x=perf_male_",k,"@x.values, y=perf_male_", k, "@y.values, \"datacountry\"= countries_short[",i, "], \"model\"= models[",j,"], \"modelcountry\"= countries_short[",k,"] , \"sex\"= geslacht[1])")))
+      eval(parse(text=paste0("aupr_males_", k, "<<- c(performance(pred_male_",k,", \"aucpr\")@y.values[[1]], countries_short[i], models[j], countries_short[k])")))
+      eval(parse(text=paste0("aupr.males <<- rbind(aupr.males, aupr_males_", k, ")")))
+      eval(parse(text=paste0("pred_female_",k,"<-prediction(data$score[data$datacountry== countries_short[",i,"] & data$model == models[", j,"] & data$modelcountry == countries_short[",k,"] & data$sex==geslacht[2]], data$original_label[data$datacountry== countries_short[",i,"] & data$model == models[", j,"] & data$modelcountry == countries_short[",k,"] & data$sex==geslacht[2]])")))
+      eval(parse(text = paste0("perf_female_", k, "<- performance(pred_female_",k,", \"prec\", \"rec\")")))
+      eval(parse(text = paste0("df_female_", k, "<<- data.frame(\"x\"=perf_female_",k,"@x.values, \"y\"=perf_female_", k, "@y.values, \"datacountry\"= countries_short[",i, "], \"model\"= models[",j,"], \"modelcountry\"= countries_short[",k,"] , \"sex\"= geslacht[2])")))
+     eval(parse(text=paste0("aupr_females_", k, "<<- c(performance(pred_female_",k,", \"aucpr\")@y.values[[1]], countries_short[i], models[j], countries_short[k])")))
+      eval(parse(text=paste0("aupr.females <<- rbind(aupr.females, aupr_females_", k, ")"))) 
+    }
+names(df_male_1)<-colnames
+names(df_male_2)<-colnames
+names(df_male_3)<-colnames
+names(df_male_4)<-colnames
+names(df_male_5)<-colnames
+names(df_male_6)<-colnames
+names(df_male_7)<-colnames
+
+names(df_female_1)<-colnames
+names(df_female_2)<-colnames
+names(df_female_3)<-colnames
+names(df_female_4)<-colnames
+names(df_female_5)<-colnames
+names(df_female_6)<-colnames
+names(df_female_7)<-colnames
+
+
+eval(parse(text=paste0("male_",j,"<- rbind(df_male_1,df_male_2,df_male_3,df_male_4,df_male_5,df_male_6,df_male_7)")))
+eval(parse(text=paste0("female_",j," <- rbind(df_female_1, df_female_2, df_female_3, df_female_4, df_female_5, df_female_6, df_female_7)")))
+eval(parse(text = paste0("Model",j," <- rbind(male_",j,",female_",j,") %>% mutate(modelcountry = case_when(modelcountry=='BE' ~ 'Belgium',modelcountry=='NL' ~ 'Netherlands',modelcountry=='FI' ~ 'Finland',modelcountry=='SA' ~ 'South Africa (EU cut off)',modelcountry=='SA2' ~ 'South Africa (Own cut off)',modelcountry=='AU' ~ 'Australia (Own cut off)',modelcountry=='AU2' ~ 'Australia (EU cut off)'))")))
+
+countries <- c("Netherlands","Finland","South Africa (Own cut off)", "South Africa (EU cut off)","Australia (Own cut off)", "Australia (EU cut off)", "Belgium")
+
+
+  }
+}
+
+curvedata <- rbind(Data_BE, Data_NL, Data_AU, Data_AU2, Data_FI, Data_SA, Data_SA2)
+
+datacountry.labs <- c("Data from \n the Netherlands","Data from \n Finland","Data from \n South Africa \n(Own cut off)", "Data from \n South Africa \n(EU cut off)","Data from \n Australia \n(Own cut off)", "Data from \n Australia \n(EU cut off)", "Data from \n Belgium")
+names(datacountry.labs) <- countries_short
+
+p<-ggplot(data=curvedata, aes(x,y))+geom_line(aes(col=modelcountry))+ylim(0,1)+xlim(0,1)+facet_grid(datacountry ~ sex, labeller = labeller(datacountry = datacountry.labs, sex = sex.labs)) + ggtitle("AUPR curves of different models on country datasets") + labs(col = "Model trained in") + xlab("Recall") + ylab("Precision") + guides(guide = guide_legend(reverse=T))
+ggsave(p, file=paste0(FolderName, "/AUPR_curves.png", sep = ""), height =9, width = 7)
+```
+
+# Load model attribution
+
+```{r SHAP value data}
+datalist <- lapply(folders, load_files, target_name='/shap-value.csv')
+for(i in 1:length(datalist)){
+  colnames(datalist[[i]])[1] <- "Id"
+}
+
+data_shap <- bind_rows(datalist) %>%
+  separate(Id, into=c('type', 'sex'), sep='-') %>%
+  filter(Variable != 'sex')%>%
+  filter(!is.na(value))%>%
+  mutate(modelcountry = case_when(modelcountry=='BE' ~ 'Belgium',
+                             modelcountry=='NL' ~ 'Netherlands',
+                             modelcountry=='FI' ~ 'Finland',
+                             modelcountry=='SA' ~ 'South Africa (EU cut off)',
+                             modelcountry=='SA2' ~ 'South Africa (Own cut off)',
+                             modelcountry=='AU' ~ 'Australia (Own cut off)', 
+                             modelcountry=='AU2' ~ 'Australia (EU cut off)'),
+         datacountry = case_when(datacountry=='BE' ~ 'Belgium',
+                             datacountry=='NL' ~ 'Netherlands',
+                             datacountry=='FI' ~ 'Finland',
+                             datacountry=='SA' ~ 'South Africa (EU cut off)',
+                             datacountry=='AU' ~ 'Australia (Own cut off)',
+                             datacountry=='AU2' ~ 'Australia (EU cut off)',
+                             datacountry=='SA2'~ 'South Africa (Own cut off)'),
+         Variable = case_when(Variable=='age' ~ 'Age',
+                              Variable=='consecutive_deferrals' ~ 'Consecutive deferrals',
+                              Variable=='days_to_previous_fb' ~ 'Days to previous whole blood donation',
+                              Variable=='Hb_first' ~ 'First Hb',
+                              Variable=='hour' ~ 'Time',
+                              Variable=='previous_Hb' ~ 'Previous Hb',
+                              Variable=='previous_Hb_def' ~ 'Previous visit low Hb',
+                              Variable=='recent_deferrals' ~ 'Recent low Hb',
+                              Variable=='recent_donations' ~ 'Recent donations',
+                              Variable=='warm_season' ~ 'Warm season',
+                              Variable=='days_to_previous_Hb' ~ 'Days to previous Hb measurement',
+                              Variable=='days_to_previous_Hb2' ~ 'Days to 2nd-previous Hb measurement',
+                              Variable=='days_to_previous_Hb3' ~ 'Days to 3rd-previous Hb measurement',
+                              Variable=='days_to_previous_Hb4' ~ 'Days to 4th-previous Hb measurement',
+                              Variable=='previous_Hb2' ~ '2nd-previous Hb',
+                              Variable=='previous_Hb3' ~ '3rd-previous Hb',
+                              Variable=='previous_Hb4' ~ '4th-previous Hb'),
+         sex = as.factor(sex)) %>%
+  rename(variable = Variable)  
+
+data_maa <- data_shap %>%
+  group_by(datacountry, model, modelcountry, sex, variable) %>%
+  summarise(maa = mean(abs(attribution))) %>%
+  ungroup() %>%
+  group_by(datacountry, model, sex, variable) %>%
+  mutate(avg_maa = mean(maa)) %>%
+  ungroup() %>%
+  group_by(variable) %>%
+  mutate(avg_avg_maa = mean(maa)) %>%
+  ungroup()
+```
+
+```{r SHAP plots}
+  plt <- ggplot(data=data_maa, aes(x = reorder(variable, avg_maa))) +facet_grid(datacountry ~ sex, labeller = labeller(datacountry = datacountry.labs, sex = sex.labs))+
+      geom_line(mapping=aes(y = maa, group = modelcountry, color = modelcountry), linewidth = 1) +
+      geom_point(mapping=aes(y = maa, color = modelcountry, shape = modelcountry), size = 2) +
+      geom_col(mapping=aes(y = avg_maa), alpha = 0.2, position = 'identity') +
+      scale_shape_manual(values=c(18, 15, 8, 17, 16, 6, 13)) +
+      coord_flip() + xlab("Mean absolute attribution") + ylab("Variable")+ theme_bw()+ ggtitle("Variable importance in different models on datasets from various countries")+
+      labs(color = "Model from", shape = "Model from") + theme(axis.text.x=element_text(size=8))
+
+ggsave(plt, file = paste0(FolderName, "/SHAP.jpg"), height = 13, width = 13)
+```
