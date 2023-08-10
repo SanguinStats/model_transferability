@@ -99,12 +99,7 @@ data <- bind_rows(datalist) %>%
 # AUPR forest plots
 
 ```{r make figures}
-currentDate <- format(Sys.time(), "%Y-%m-%d")
-folderpath <- "~/Amber/SanguinStats/Resultaten/figures/"
-FolderName <- paste(folderpath, currentDate,sep="")
-dir.create(FolderName)
-
-FolderName <- paste("~/Amber/SanguinStats/Resultaten/figures/", currentDate,"/manuscript_plots",sep="")
+FolderName <- paste("~/Amber/SanguinStats/model_transferability/figures/Manuscript_plots")
 dir.create(FolderName)
 
 countries <- c("Netherlands","Finland","South Africa (Own cut off)", "South Africa (EU cut off)","Australia (Own cut off)", "Australia (EU cut off)", "Belgium")
@@ -126,7 +121,7 @@ aupradjplot <- ggplot(dfadj, aes(x=value,
              y = modelcountry,
              color = modelcountry)) +
   geom_pointrange(position = position_dodge(width= 0.6), size = 0.35, fatten = 0.8) +
-  labs(title="Model performance by dataset and country models were trained in",
+  labs(title="Performance  by dataset of models trained in different countries",
        color = "Model trained in") +
   coord_cartesian(xlim=c(0, 1)) + 
   facet_grid(datacountry ~ sex, labeller = labeller(datacountry = datacountry.labs, sex = sex.labs)) + xlab("AUPR adjusted for deferral rate") + ylab("Model trained in") + theme(legend.position = "none")+scale_y_discrete(limits = rev(levels(dfadj$modelcountry)))
@@ -147,7 +142,7 @@ auprplot<-  ggplot(df, aes(x=value,
              y= modelcountry, 
              color = modelcountry)) +
   geom_pointrange(position = position_dodge(width= 0.6), size = 0.35, fatten = 0.8) +
-  labs(title="Model performance by dataset and country models were trained in",
+  labs(title="Performance  by dataset of models trained in different countries",
        color = "Model trained in") +
   coord_cartesian(xlim=c(0, 1)) + 
   facet_grid(datacountry ~ sex, labeller = labeller(datacountry = datacountry.labs, sex = sex.labs)) + xlab("AUPR") + ylab("Model trained in") + theme(legend.position = "none") + scale_y_discrete(limits = rev(levels(df$modelcountry)))
