@@ -40,6 +40,25 @@ deferral_rates
 ```
 
 ```{r}
+conv <- c("Australia\n own cutoff"="Australia2", "Australia\n EU cutoff"="Australia",
+          "South Africa\n own cutoff"="South-Africa2", "South Africa\n EU cutoff"="South-Africa")
+df <- deferral_rates %>% 
+  select(-c(filename, data_country_id)) 
+  #filter(!str_detect(data_country, "2")) %>% 
+df %>%  pivot_wider(names_from = sex, values_from = deferral_rate)
+g <- df %>%
+  mutate(data_country = fct_recode(data_country, !!!conv)) %>%
+  ggplot(aes(x=data_country, y=deferral_rate, fill=sex)) +
+  geom_col(position = "dodge") +
+  labs(x="Country", y="Deferral rate", fill="Sex") +
+  geom_text(mapping=aes(label=sprintf("%.2f", deferral_rate)),  
+            #hjust=1.1, 
+            vjust=-0.3, position=position_dodge(width=0.9))
+g
+ggsave(file.path(fig_path, "deferral_rates.pdf"), g, width=180, height=120, unit="mm")
+```
+
+```{r}
 helper <- function(filename) {
   df <- read_csv(filename, show_col_types=FALSE)
   df %>% select(sex = Sex, starts_with("AUPR"))
