@@ -80,13 +80,13 @@ models <- tribble(~Model_country, ~Model, ~dir, ~file,
 "Australia2", "5don", "australia-2023-02-24", "svm-and-rf-models_Australia_5don.zip",
 "Australia2", "5don4hb", "australia-2023-02-24", "svm-and-rf-models_Australia_5don4hb.zip",
 # EU thresholds
-"South-Africa", "2don", "south-africa-2023-02-28", "svm-and-rf-models_South_Africa_2don.zip",
-"South-Africa", "5don", "south-africa-2023-02-28", "svm-and-rf-models_South_Africa_5don.zip",
-"South-Africa", "5don4hb", "south-africa-2023-02-28", "svm-and-rf-models_South_Africa_5don4hb.zip",
+"South Africa", "2don", "south-africa-2023-02-28", "svm-and-rf-models_South_Africa_2don.zip",
+"South Africa", "5don", "south-africa-2023-02-28", "svm-and-rf-models_South_Africa_5don.zip",
+"South Africa", "5don4hb", "south-africa-2023-02-28", "svm-and-rf-models_South_Africa_5don4hb.zip",
 # South Africa's own thresholds
-"South-Africa2", "2don", "south-africa-2023-04-05-unified_threshold", "svm-and-rf-models_South_Africa_2don_Own.zip",
-"South-Africa2", "5don", "south-africa-2023-04-05-unified_threshold", "svm-and-rf-models_South_Africa_5don_Own.zip",
-"South-Africa2", "5don4hb", "south-africa-2023-04-05-unified_threshold", "svm-and-rf-models_South_Africa_5don4hb_Own.zip"
+"South Africa2", "2don", "south-africa-2023-04-05-unified_threshold", "svm-and-rf-models_South_Africa_2don_Own.zip",
+"South Africa2", "5don", "south-africa-2023-04-05-unified_threshold", "svm-and-rf-models_South_Africa_5don_Own.zip",
+"South Africa2", "5don4hb", "south-africa-2023-04-05-unified_threshold", "svm-and-rf-models_South_Africa_5don4hb_Own.zip"
 )
 models <- models %>% 
   mutate(filename=file.path(base_dir, dir, file))
@@ -147,10 +147,22 @@ tmp <- full_data_validate_datas %>% mutate(n = map_int(df, nrow)) %>% select(-c(
 tmp
 min_n <- min(tmp$n)
 cat(sprintf("Downsample all data sets to size %i\n", min_n ))
-full_data_validate_datas <- full_data_validate_datas %>%
-  mutate(df = map(df, function(df) slice_sample(df, n=min_n)))
-tmp <- full_data_validate_datas %>% mutate(n = map_int(df, nrow)) %>% select(-c(Subdirectory, df, data_file))
+#set.seed(123)
+filename <- file.path(result_path, "full_data_validate_datas.rds")
+if (!file.exists(filename)) {
+  full_data_validate_datas <- full_data_validate_datas %>%
+    mutate(df = map(df, function(df) slice_sample(df, n=min_n)))
+  saveRDS(full_data_validate_datas, filename)
+} else {
+  full_data_validate_datas <- readRDS(filename)
+}
+tmp <- full_data_validate_datas %>% 
+  mutate(n = map_int(df, nrow),
+         deferrals = map_int(df, function(df) sum(df$Hb_deferral=="Deferred")),
+         deferral_rate = deferrals / n) %>%
+  select(-c(Subdirectory, df, data_file))
 tmp
+write_tsv(tmp, file.path(result_path, "data_sizes.tsv"))
 ```
 
 ```{r Compute the predictions on full data}
@@ -519,10 +531,11 @@ make_cooccurrence_plot <- function(df, title=NULL, original_label=1, predicted_l
     ggplot(aes(x=Model_country.x, y=Model_country.y, fill=.data[[fill_name]])) + 
     geom_raster(na.rm=TRUE) +
     geom_text(aes(label=n), color="white", size=3, na.rm=TRUE) +
-    labs(x="Model country", y="Model country", title=title, 
-         subtitle=sprintf("Finnish data, n=%i", number_of_observations), 
+    labs(x="Model x country", y="Model y country", title=title, 
+         subtitle=sprintf("n=%i", number_of_observations), 
          fill="Percentage of deferrals predicted correctly") +
     facet_grid(sex ~ Model) +
+    theme_gray(base_size = 9) +
     theme(legend.position=legend.position,
           axis.text.x = element_text(angle = 45, vjust=1, hjust=1),
           legend.text = element_text(angle = 45, vjust=1, hjust=1))
@@ -532,7 +545,7 @@ make_cooccurrence_plot <- function(df, title=NULL, original_label=1, predicted_l
 
 10,000 donors
 ```{r}
-g <- make_cooccurrence_plot(df_with_pred2, title="Number of deferrals both models detect")
+g <- make_cooccurrence_plot(df_with_pred2, title="Number of true deferrals that both models detect in Finnish data")
 g
 ggsave(sprintf("%s/cooccurrences-of-true-positives-10000.pdf", fig_path), g, width=180, height=120, unit="mm")
 ```
@@ -541,7 +554,7 @@ Full data
 
 ```{r}
 g <- make_cooccurrence_plot(full_data_df_with_pred2, 
-                            title="Number of deferrals both countries detect")
+                            title="Number of true deferrals both models detect in Finnish data")
 g
 ggsave(sprintf("%s/cooccurrences-of-true-positives-full-data.pdf", fig_path), g, width=180, height=120, unit="mm")
 ```
@@ -550,7 +563,7 @@ ggsave(sprintf("%s/cooccurrences-of-true-positives-full-data.pdf", fig_path), g,
 10,000 donors
 
 ```{r}
-g <- make_cooccurrence_plot(df_with_pred2, title="Number of deferrals x model detects but y model does not",
+g <- make_cooccurrence_plot(df_with_pred2, title="Number of true deferrals model x detects in Finnish data but model  y does not",
                             original_label=1, predicted_label.x=1, predicted_label.y=0)
 g
 ggsave(sprintf("%s/x-better-10000.pdf", fig_path), g, width=180, height=120, unit="mm")
@@ -559,7 +572,7 @@ ggsave(sprintf("%s/x-better-10000.pdf", fig_path), g, width=180, height=120, uni
 Full data
 
 ```{r}
-g <- make_cooccurrence_plot(full_data_df_with_pred2, title="Number of deferrals x model detects but y model does not",
+g <- make_cooccurrence_plot(full_data_df_with_pred2, title="Number of true deferrals model x detects in Finnish data but model y does not",
                             original_label=1, predicted_label.x=1, predicted_label.y=0)
 g
 ggsave(sprintf("%s/x-better-full-data.pdf", fig_path), g, width=180, height=120, unit="mm")
