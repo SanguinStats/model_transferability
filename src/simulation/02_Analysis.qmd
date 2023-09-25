@@ -1,0 +1,362 @@
+---
+title: "Simulation model transferability"
+author: Amber Meulenbeld & Mart Janssen
+format:
+  html:
+    code-fold: true
+#    page-layout: full
+    toc: true
+    embed-resources: true
+execute:
+  cache: true
+---
+# Initialization
+```{r warning=F, message=F}
+library(stats)
+library("randomForest")
+library(ROCR)
+library(knitr)
+
+source("01_Functions.R")
+```
+
+# Parameters
+
+To evaluate the behaviour of prediction models for donor deferral we simulated an artificial donor population with mean Hb level of 9.72 and a Sd of 0.7 mmol/L. We also presumed that the Hb level of donors would be measured with a measurement error with a standard deviation of 0.5 mmol/L (without any bias).
+
+
+This population has a deferral rate of 3%.  This will lead to an observed proportion of 6.3% of measurements below the deferral threshold (see @fig-distr). In case the measurement variation would be only half as big (0.25 mmol/L) there would still be a deferral rate of 3.8%.
+
+```{r}
+n<-1e4          # nr of simulation records
+PopMean<-9.4    # population mean Hb
+PopSd  <-0.7    # standard deviation of population Hb
+MeasSd <-0.5    # standard deviation of Hb measurement
+threshold<-8.4  # deferral threshold
+nr_meas<-2      # number of measurements performed
+propdef<-.05    # proportion deferrals to be analysed
+
+# proportion deferrals to be analysed
+props<-c(.01, .02, .04, .08, .16)
+# measurement variability to be analysed
+MeasSds<-c(0.5, 0.25)
+
+# set train/test/validation proportions
+trainprop<-0.80 # proportion training data
+testprop <-0.20 # proportion test data
+
+set.seed(1)
+```
+
+# Data simulation
+
+```{r}
+(d1<-createDatasets(propdef=0.03, printresults = F))
+
+```
+
+The mean Hb in our simulated population is:
+```{r}
+#| echo: false
+PopMean  # this value is set by the createDatasets function
+```
+
+The deferral percentage in our test data:
+```{r}
+#| echo: false
+createNewTestDataset()
+
+```
+
+## Distributions
+
+```{r}
+#| label: fig-distr
+#| fig-cap: Population Hb distribution and measured Hb distribution for different measurement levels of measurement error (Sd of 0.50 and 0.25 mmol/L respectively).
+if(T) {
+  # plot data with and without measurement error
+  plot(density(data_train$true), lwd=2, main="", xlab="Hb level [mmol/L]")
+  abline(v=threshold,col=8)
+  dens<-density(data_train$meas1)
+  lines(dens$x,dens$y, col="red", lwd=2)
+  dens<-density(data_test$meas1)
+  MeasSd<-MeasSds[2]
+  createNewTestDataset()
+  sum(data_train$deferral==1)/nrow(data_train)
+  sum(data_test$deferral==1)/nrow(data_test)
+  sum(data_test$meas1<threshold)/nrow(data_test)
+  MeasSd<-MeasSds[1]
+  lines(dens$x,dens$y, col="green", lwd=2)
+  legend("topright", c("Population distribution","Measurement Sd=0.50","Measurement Sd=0.25"), 
+         lty=c(1,1,1), col=c(1,2,3), lwd=c(2,2,2))
+}
+```
+
+# Model fitting
+We simulated a dataset of 10,000 donations from the above population of which the Hb levels were measured with a standard deviation of 0.5 mmol/L where we did two subsequent measurements. A random forest model was trained on 80% of the data to predict donor deferral on the second Hb measurement using the Hb levels from the first measurement as a predictor. The quality of the deferral prediction model was expressed as the Area Under the Precision Recall curve (AUPR) which was derived from applying the model to a test data set consisting of the remaining 20% of the data. @fig-AUPR shows the precision recall curve for a training and test dataset. 
+
+```{r, echo=F}
+bestmtry <- tuneRF(data_train,data_train$deferral,stepFactor=1.20, improve = 0.010, trace=F, plot= F) 
+RFmodel <- randomForest(deferral~meas1,data=data_train)
+```
+
+Now calculate the AUPR values for the training set:
+```{r}
+pred_train_p = predict(RFmodel, type = "prob")
+perf_train_data = prediction(pred_train_p[,2], data_train$deferral)
+train_perf = performance(perf_train_data, "prec","sens")
+train_aucpr = performance(perf_train_data, "aucpr")
+train_aucpr@y.values[[1]] 
+```
+
+And the test set:
+```{r}
+pred_test_p = predict(RFmodel, newdata = data_test, type= "prob")
+perf_test_data = prediction(pred_test_p[,2], data_test$deferral)
+test_perf = performance(perf_test_data, "prec","sens")
+test_aucpr = performance(perf_test_data, "aucpr")
+test_aucpr@y.values[[1]] 
+```
+
+## Plot the AUPR
+```{r}
+#| label: fig-AUPR
+#| fig-cap: Precision-recall curve of a Random Forrest deferral prediction model when applied to training and test data sets with a 3% deferral rate.
+plot(train_perf, main="Precision Recall Curve for Random Forest",col=2,lwd=2, xlab="Recall")
+lines(unlist(train_perf@x.values),unlist(train_perf@y.values), col=2, lwd=2)
+lines(unlist(test_perf@x.values),unlist(test_perf@y.values), col=3, lwd=2)
+legend("topright", c(paste0("Training data (AUPR=",round(train_aucpr@y.values[[1]],3),")"), paste0("Test data (AUPR=",round(test_aucpr@y.values[[1]],3),")")), col=c(2,3), lwd=c(2,2))
+```
+
+# Simulation
+We repeated this procedure for 100 simulations, for various deferral rates (1%, 2%, 4%, 8% and 16%). Deferral rates were set by adjusting the mean population Hb levels accordingly. @fig-mAUPR shows the AUPR estimates for RF models trained and tested at various deferral rates. This figure clearly shows that the AUPR increases with an increase in donor deferral rate. @fig-mAUPR2 again shows the AUPR estimates for RF models for various deferral rates, but now shows the results for models trained at all levels of deferral rate applied to test data at all deferral rates. These results are also shown in @tbl-AUPR1 and @tbl-AUPR2. @fig-mAUPR2 shows that models trained on data sets with higher deferral rates have a (slightly) better performance. @fig-mAUPR3 also shows the result of applying these models to test datasets with a lower measurement error (0.25 instead of 0.50 mmol/L). This figure clearly shows the increase in performance of the predictions when measurements are more accurate. The data presented in this figure is also shown in @tbl-AUPR1 and @tbl-AUPR2.
+
+```{r, include=FALSE}
+PopMeans<-matrix(NA, nrow=length(props), ncol=length(MeasSds))
+for (i in 1:length(props)){
+  fo<-function(x) (pnorm(threshold, mean=x, sqrt(PopSd^2+MeasSds[1]^2))-props[i])^2
+  sol<-optimize(fo, c(0,2*PopMean))
+  PopMeans[i,1] <- sol$minimum
+  print(paste(sol$minimum, pnorm(threshold, mean=PopMeans[i,1], PopSd),
+              pnorm(threshold, mean=PopMeans[i,1], sqrt(PopSd^2+MeasSds[1]^2))))
+}
+for (i in 1:length(props)){
+  fo<-function(x) (pnorm(threshold, mean=x, sqrt(PopSd^2+MeasSds[2]^2))-props[i])^2
+  sol<-optimize(fo, c(0,2*PopMean))
+  PopMeans[i,2] <- sol$minimum
+  print(paste(sol$minimum, pnorm(threshold, mean=PopMeans[i,2], PopSd),
+              pnorm(threshold, mean=PopMeans[i,2], sqrt(PopSd^2+MeasSds[2]^2))))
+}
+
+nrsim<-3; i<-1; j<-3; k<-1; l<-1
+
+set.seed(1)
+dosim(100)
+
+res = list(n=n, props=props, trainprop=trainprop, testprop=trainprop, MeasSds=MeasSds, 
+          PopSd=PopSd, threshold=threshold, nr_meas=nr_meas, 
+          tedao=tedao, trdao=trdao, dsc=dsc, dsc2=dsc2)
+
+dsc<-res$dsc
+dsc2<-res$dsc2
+tedao<-res$tedao
+trdao<-res$trdao
+props<-res$props
+trainprop<-res$trainprop
+testprop<-res$trainprop
+MeasSds<-res$MeasSds
+PopSd<-res$PopSd
+threshold<-res$threshold
+nr_meas<-res$nr_meas
+
+lp<-length(props)
+lm<-length(MeasSds)
+for (l in 1:lm){
+  eval(parse(text=paste0("auMean",l,"<-matrix(0, nrow=lp, ncol=lp)")))
+  eval(parse(text=paste0("auSd",l,"<-matrix(0, nrow=lp, ncol=lp)")))
+  eval(parse(text=paste0("auUL",l,"<-matrix(0, nrow=lp, ncol=lp)")))
+  eval(parse(text=paste0("auLL",l,"<-matrix(0, nrow=lp, ncol=lp)")))
+  
+  eval(parse(text=paste0("dscMean",l,"<-matrix(0, nrow=lp, ncol=lp)")))
+  eval(parse(text=paste0("dscSd",l,"<-matrix(0, nrow=lp, ncol=lp)")))
+  eval(parse(text=paste0("dscUL",l,"<-matrix(0, nrow=lp, ncol=lp)")))
+  eval(parse(text=paste0("dscLL",l,"<-matrix(0, nrow=lp, ncol=lp)")))
+  for (i in 1:lp){
+    for (j in 1:lp){
+      eval(parse(text=paste0("auMean",l,"[i,j]<-mean(tedao[i,j,",l,",])")))
+      eval(parse(text=paste0("auSd",l,"[i,j]<-sd(tedao[i,j,",l,",])")))
+      eval(parse(text=paste0("auUL",l,"[i,j]<-quantile(tedao[i,j,",l,",], .975)")))
+      eval(parse(text=paste0("auLL",l,"[i,j]<-quantile(tedao[i,j,",l,",], .025)")))
+      
+      eval(parse(text=paste0("dscMean",l,"[i,j]<-mean(dsc2[i,j,",l,",])")))
+      eval(parse(text=paste0("dscSd",l,"[i,j]<-sd(dsc2[i,j,",l,",])")))
+      eval(parse(text=paste0("dscUL",l,"[i,j]<-quantile(dsc2[i,j,",l,",], .975)")))
+      eval(parse(text=paste0("dscLL",l,"[i,j]<-quantile(dsc2[i,j,",l,",], .025)")))
+    }
+  }
+}  
+
+auMean<-apply(trdao,1,mean)
+auSd<-apply(trdao,1,sd)
+auLL<-apply(trdao,1,function (x) quantile(x,0.975))
+auUL<-apply(trdao,1,function (x) quantile(x,0.025))
+dscMean<-apply(dsc,1,mean)
+dscSd<-apply(dsc,1,sd)
+dscLL<-apply(dsc,1,function (x) quantile(x,0.975))
+dscUL<-apply(dsc,1,function (x) quantile(x,0.025))
+d<-min(props)/12
+```
+
+```{r}
+#| label: fig-defrates
+#| fig-cap: The proportion of donors below the deferral threshold for the training and test data sets in the simulation as function of the preset proportion of deferral (1%, 2%, 4%, 8% and 16%).
+
+plot(c(props-d,props+d),c(dscMean,diag(dscMean1)), pch=rep(c(1,4),each=lp), ylim=c(0,.2), 
+     ylab="Proportion deferrals in sample", xlab="Proportion deferrals")
+for (i in 1:lp) {
+  lines(rep(props[i]-d,2),c(qnorm(.975, mean=dscMean[i], sd=dscSd[i]),
+                            qnorm(.025, mean=dscMean[i], sd=dscSd[i])))
+  lines(rep(props[i]+d,2),c(qnorm(.975, mean=dscMean1[i,i], sd=dscSd1[i,i]),
+                            qnorm(.025, mean=dscMean1[i,i], sd=dscSd1[i,i])))
+}
+legend("bottomright", c("Training data", "Test data", "95% Confidence interval"), lty=c(NA,NA,1), pch=c(1,4,NA))
+```
+
+```{r}
+#| label: fig-mAUPR
+#| fig-cap: Mean area under the precision-recall curve (AUPR) and the spread in the estimates for the individual training and test data sets as a function of the proportion of deferrals.
+
+plot(c(props-d,props+d),c(auMean,diag(auMean1)), pch=rep(c(1,4),each=lp), ylim=c(0,.5), 
+     ylab="Area under the PR curve", xlab="Proportion deferrals")
+for (i in 1:lp) {
+  lines(rep(props[i]-d,2),c(qnorm(.975, mean=auMean[i], sd=auSd[i]),
+                            qnorm(.025, mean=auMean[i], sd=auSd[i])))
+  lines(rep(props[i]+d,2),c(qnorm(.975, mean=auMean1[i,i], sd=auSd1[i,i]),
+                            qnorm(.025, mean=auMean1[i,i], sd=auSd1[i,i])))
+}
+legend("bottomright", c("Training data", "Test data", "95% Confidence interval"), lty=c(NA,NA,1), pch=c(1,4,NA))
+```
+
+```{r}
+#| label: fig-mAUPR2
+#| fig-cap: Mean area under the precision-recall curve (AUPR) and the spread in the estimates for the individual training and test data sets as a function of the proportion of deferrals. Models developed on training data at each of the deferral proportions are applied on all test datasets.
+
+plot(c(props-d,props+d),c(auMean-props,diag(auMean1)-props), pch=rep(c(1,4),each=lp), ylim=c(0,.5), 
+     ylab="Corrected area under the PR curve", xlab="Proportion deferrals")
+for (i in 1:lp) {
+  lines(rep(props[i]-d,2),c(qnorm(.975, mean=auMean[i]-props[i], sd=auSd[i]),
+                            qnorm(.025, mean=auMean[i]-props[i], sd=auSd[i])))
+  lines(rep(props[i]+d,2),c(qnorm(.975, mean=auMean1[i,i]-props[i], sd=auSd1[i,i]),
+                            qnorm(.025, mean=auMean1[i,i]-props[i], sd=auSd1[i,i])))
+}
+legend("bottomright", c("Training data", "Test data", "95% Confidence interval"), lty=c(NA,NA,1), pch=c(1,4,NA))
+
+```
+
+```{r}
+#| label: fig-mAUPR3
+#| fig-cap: Mean area under the precision-recall curve (AUPR) and the spread in the estimates for the individual training and test data sets as a function of the proportion of deferrals. Models developed on training data at each of the deferral proportions are applied on all test datasets. In addition, AUPR estimates for the prediction models are shown when applied to test datasets with lower measurement error (0.25 mmol/L).
+
+plot(props-d,auMean, pch=rep(1,lp), ylim=c(0,.6), xlim=c(0,0.17), 
+     ylab="Area under the PR curve", xlab="Proportion deferrals")
+for (i in 1:lp) {
+  lines(rep(props[i]-d,2),c(qnorm(.975, mean=auMean[i], sd=auSd[i]),
+                            qnorm(.025, mean=auMean[i], sd=auSd[i])))
+}
+for (i in 1:lp) {
+  lines(rep(props[i]+2*d,2), c(qnorm(.975, mean=auMean1[1,i], sd=auSd1[1,i]),
+                               qnorm(.025, mean=auMean1[1,i], sd=auSd1[1,i])))
+  lines(rep(props[i]+3*d,2), c(qnorm(.975, mean=auMean1[2,i], sd=auSd1[2,i]),
+                               qnorm(.025, mean=auMean1[2,i], sd=auSd1[2,i])))
+  lines(rep(props[i]+4*d,2), c(qnorm(.975, mean=auMean1[3,i], sd=auSd1[3,i]),
+                               qnorm(.025, mean=auMean1[3,i], sd=auSd1[3,i])))
+  lines(rep(props[i]+5*d,2), c(qnorm(.975, mean=auMean1[4,i], sd=auSd1[4,i]),
+                               qnorm(.025, mean=auMean1[4,i], sd=auSd1[4,i])))
+  lines(rep(props[i]+6*d,2), c(qnorm(.975, mean=auMean1[5,i], sd=auSd1[5,i]),
+                               qnorm(.025, mean=auMean1[5,i], sd=auSd1[5,i])))
+
+  points(props[i]+2*d, auMean1[1,i], pch=3)
+  points(props[i]+3*d, auMean1[2,i], pch=3)
+  points(props[i]+4*d, auMean1[3,i], pch=3)
+  points(props[i]+5*d, auMean1[4,i], pch=3)
+  points(props[i]+6*d, auMean1[5,i], pch=3)
+  
+  if (F) {
+    points(props[i]+2*d, auUL1[1,i], pch=1)
+    points(props[i]+3*d, auUL1[2,i], pch=1)
+    points(props[i]+4*d, auUL1[3,i], pch=1)
+    points(props[i]+5*d, auUL1[4,i], pch=1)
+    points(props[i]+6*d, auUL1[5,i], pch=1)
+    
+    points(props[i]+2*d, auLL1[1,i], pch=1)
+    points(props[i]+3*d, auLL1[2,i], pch=1)
+    points(props[i]+4*d, auLL1[3,i], pch=1)
+    points(props[i]+5*d, auLL1[4,i], pch=1)
+    points(props[i]+6*d, auLL1[5,i], pch=1)
+  }
+}
+legend("bottomright", c("Training data", "Test data (increasing deferral rate", 
+                        "training data from left to right)", "95% Confidence interval"), 
+       lty=c(NA,NA,NA,1), pch=c(1,3,NA,NA))
+d2=d/2
+for (i in 1:lp) {
+  lines(rep(props[i]+2*d+d2,2), c(qnorm(.975, mean=auMean2[1,i], sd=auSd2[1,i]),
+                               qnorm(.025, mean=auMean2[1,i], sd=auSd2[1,i])))
+  lines(rep(props[i]+3*d+d2,2), c(qnorm(.975, mean=auMean2[2,i], sd=auSd2[2,i]),
+                               qnorm(.025, mean=auMean2[2,i], sd=auSd2[2,i])))
+  lines(rep(props[i]+4*d+d2,2), c(qnorm(.975, mean=auMean2[3,i], sd=auSd2[3,i]),
+                               qnorm(.025, mean=auMean2[3,i], sd=auSd2[3,i])))
+  lines(rep(props[i]+5*d+d2,2), c(qnorm(.975, mean=auMean2[4,i], sd=auSd2[4,i]),
+                               qnorm(.025, mean=auMean2[4,i], sd=auSd2[4,i])))
+  lines(rep(props[i]+6*d+d2,2), c(qnorm(.975, mean=auMean2[5,i], sd=auSd2[5,i]),
+                               qnorm(.025, mean=auMean2[5,i], sd=auSd2[5,i])))
+  
+  points(props[i]+2*d+d2, auMean2[1,i], pch=2)
+  points(props[i]+3*d+d2, auMean2[2,i], pch=2)
+  points(props[i]+4*d+d2, auMean2[3,i], pch=2)
+  points(props[i]+5*d+d2, auMean2[4,i], pch=2)
+  points(props[i]+6*d+d2, auMean2[5,i], pch=2)
+}
+legend("bottomright", c("Training data", "Test data 1 (increasing deferral rates", 
+                        "in training data from left to right)", paste0("Sd of Measurements=",
+                        round(MeasSds[1],2)),  "Test data 2 ", paste0("Sd of Measurements=",
+                        round(MeasSds[2],2)),"95% Confidence interval"), 
+                        lty=c(NA,NA,NA,NA,NA,NA,1), pch=c(1,3,NA,NA,2,NA,NA))
+
+```
+```{r, include = F}
+export<-cbind(rbind(auMean1,auMean2),rbind(auSd1,auSd2))
+```
+
+```{r}
+#| label: tbl-AUPR1
+#| tbl-cap: "AUPR estimates of Hb deferral prediction models developed on and applied to datasets with various deferral rates with measurement error of 0.50 mmol/L."
+#| tbl-colwidths: [60,40]
+rownames(auMean1) <- c("Training 1%", "Training 2%", "Training 4%", "Training 8%", "Training 16%")
+colnames(auMean1) <- c("Test 1%", "Test 2%", "Test 4%", "Test 8%", "Test 16%")
+kable(auMean1, digits = 3, row.names = T)
+```
+```{r}
+#| label: tbl-sdAUPR1
+#| tbl-cap: "Standard deviation (obtained from 100 simulations) of AUPR estimates of Hb deferral prediction models developed on and applied to datasets with various deferral rates with measurement error of 0.50 mmol/L."
+#| tbl-colwidths: [60,40]
+rownames(auSd1) <- c("Training 1%", "Training 2%", "Training 4%", "Training 8%", "Training 16%")
+colnames(auSd1) <- c("Test 1%", "Test 2%", "Test 4%", "Test 8%", "Test 16%")
+kable(auSd1, digits = 3, row.names = T)
+```
+```{r}
+#| label: tbl-AUPR2
+#| tbl-cap: "AUPR estimates of Hb deferral prediction models developed on and applied to datasets with various deferral rates with measurement error of 0.25 mmol/L."
+#| tbl-colwidths: [60,40]
+rownames(auMean2) <- c("Training 1%", "Training 2%", "Training 4%", "Training 8%", "Training 16%")
+colnames(auMean2) <- c("Test 1%", "Test 2%", "Test 4%", "Test 8%", "Test 16%")
+kable(auMean2, digits = 3, row.names = T)
+```
+```{r}
+#| label: tbl-sdAUPR2
+#| tbl-cap: "Standard deviation (obtained from 100 simulations) of AUPR estimates of Hb deferral prediction models developed on and applied to datasets with various deferral rates with measurement error of 0.25 mmol/L."
+#| tbl-colwidths: [60,40]
+rownames(auSd2) <- c("Training 1%", "Training 2%", "Training 4%", "Training 8%", "Training 16%")
+colnames(auSd2) <- c("Test 1%", "Test 2%", "Test 4%", "Test 8%", "Test 16%")
+kable(auSd2, digits = 3, row.names = T)
+```
