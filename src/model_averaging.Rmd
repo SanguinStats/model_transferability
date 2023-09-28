@@ -147,7 +147,7 @@ tmp <- full_data_validate_datas %>% mutate(n = map_int(df, nrow)) %>% select(-c(
 tmp
 min_n <- min(tmp$n)
 cat(sprintf("Downsample all data sets to size %i\n", min_n ))
-#set.seed(123)
+set.seed(123)
 filename <- file.path(result_path, "full_data_validate_datas.rds")
 if (!file.exists(filename)) {
   full_data_validate_datas <- full_data_validate_datas %>%
@@ -431,152 +431,12 @@ filename <- file.path(fig_path, "model_average_finnish_data_aupr.png")
 #ggsave(filename, g)
 ```
 
-## Co-occurrence
-
-How often models predict each label?
 
 
-```{r}
-# df_with_pred <- df2 %>% 
-#   mutate(predicted_label = as.integer(score >= 0.5))
-# 10,000 donors
-df_with_pred2 <- recomputed_datas %>% 
-  select(-sex) %>% 
-  unnest(df) %>% 
-  select(-c(validate, fit))
-full_data_df_with_pred2 <- full_data_recomputed_datas %>% 
-  select(-sex) %>% 
-  unnest(df) %>% 
-  select(-c(validate, fit))
-df_with_pred2 %>% select(Model_country, predicted_label, sex, Model) %>% table()
-```
-
-### Identically predicted labels
-
-```{r}
-cooccurrence <- df_with_pred2 %>% 
-  group_by(Model, sex, n, predicted_label) %>%
-  summarise(x = list(expand.grid(Model_country, Model_country)), .groups="drop") %>% 
-  unnest(x) %>% 
-  count(Model, sex, Var1, Var2) %>%
-  mutate(across(c("Var1", "Var2"), 
-                function(x) fct_relevel(x, setdiff(countries2, "Average")))
-  )
-```
 
 
-```{r}
-cooccurrence %>%
-  filter(Var1 != "Average" & Var2 != "Average") %>%
-  mutate(Var2 = fct_rev(Var2)) %>%
-  ggplot(aes(x=Var1, y=Var2, fill=n)) + 
-  geom_raster() +
-  geom_text(aes(label=n), color="white", size=3) +
-  labs(x="Model country", y="Model country", title="How often two countries predict the same label", 
-       subtitle="Finnish data", fill="Count") +
-  facet_grid(sex ~ Model) +
-  theme(legend.position="bottom",
-        axis.text.x = element_text(angle = 45, vjust=1, hjust=1),
-        legend.text = element_text(angle = 45, vjust=1, hjust=1))
-```
-
-### True predicted deferrals
-
-```{r, eval=FALSE}
-cooccurrence2 <- df_with_pred2 %>% 
-  filter(Model_country != "Average",
-         original_label == 1,
-         predicted_label == 1) %>% 
-  group_by(Model, sex, n) %>%
-  summarise(x = list(expand.grid(Model_country, Model_country)), .groups="drop") %>% 
-  unnest(x) %>% 
-  count(Model, sex, Var1, Var2) %>%
-  mutate(across(c("Var1", "Var2"), function(x) fct_relevel(x, setdiff(countries2, "Average"))))
-```
-
-Another way to do the same in a more general way.
-
-```{r}
-make_cooccurrence_plot <- function(df, title=NULL, original_label=1, predicted_label.x=1, predicted_label.y=1,
-                                   color_by_percentage=FALSE) {
-  if (color_by_percentage) {
-    fill_name <- "percentage" 
-    legend.position <- "bottom"
-  } else {
-    fill_name <- "n"
-    legend.position <- "nono"
-  }
-  tmp <- df %>% select(Model, Model_country, sex, original_label, predicted_label, n) %>%
-    filter(!Model_country %in% c("Australia2", "South-Africa2"))  # Don't show results for countries' own cutoffs
-  cross_product <- inner_join(tmp, tmp, by=c("Model", "sex", "original_label", "n"), 
-                              relationship = "many-to-many") %>%
-    relocate(Model, sex, original_label, n)
-  cooccurrence <- cross_product %>% 
-    filter(original_label=={{original_label}}, predicted_label.x=={{predicted_label.x}},
-           predicted_label.y=={{predicted_label.y}}) %>%
-    count(Model, sex, Model_country.x, Model_country.y)
-  number_of_observations <- max(df$n)
-  number_of_deferrals <- df %>% 
-    group_by(sex, Model, Model_country) %>% summarise(deferrals = sum(original_label), .groups="drop") %>%
-    select(-Model_country) %>%
-    distinct()
-  # There is some aligment/NA problem in geom_raster, hence I explicitly insert one NA cell.
-  #tmp <- expand_grid(Model="5don4hb", sex=c("female", "male"), Var1=factor("Belgium"), Var2=factor("Belgium"), n=NA)
-  g <- cooccurrence %>%
-    #bind_rows(tmp) %>%
-    left_join(number_of_deferrals, by=c("sex", "Model")) %>%
-    mutate(percentage = 100*n/deferrals) %>%
-    #filter(Var1 != "Average" & Var2 != "Average") %>%
-    mutate(Model_country.y = fct_rev(Model_country.y)) %>%
-    ggplot(aes(x=Model_country.x, y=Model_country.y, fill=.data[[fill_name]])) + 
-    geom_raster(na.rm=TRUE) +
-    geom_text(aes(label=n), color="white", size=3, na.rm=TRUE) +
-    labs(x="Model x country", y="Model y country", title=title, 
-         subtitle=sprintf("n=%i", number_of_observations), 
-         fill="Percentage of deferrals predicted correctly") +
-    facet_grid(sex ~ Model) +
-    theme_gray(base_size = 9) +
-    theme(legend.position=legend.position,
-          axis.text.x = element_text(angle = 45, vjust=1, hjust=1),
-          legend.text = element_text(angle = 45, vjust=1, hjust=1))
-  g
-}
-```
-
-10,000 donors
-```{r}
-g <- make_cooccurrence_plot(df_with_pred2, title="Number of true deferrals that both models detect in Finnish data")
-g
-ggsave(sprintf("%s/cooccurrences-of-true-positives-10000.pdf", fig_path), g, width=180, height=120, unit="mm")
-```
-
-Full data
-
-```{r}
-g <- make_cooccurrence_plot(full_data_df_with_pred2, 
-                            title="Number of true deferrals both models detect in Finnish data")
-g
-ggsave(sprintf("%s/cooccurrences-of-true-positives-full-data.pdf", fig_path), g, width=180, height=120, unit="mm")
-```
 
 
-10,000 donors
-
-```{r}
-g <- make_cooccurrence_plot(df_with_pred2, title="Number of true deferrals model x detects in Finnish data but model  y does not",
-                            original_label=1, predicted_label.x=1, predicted_label.y=0)
-g
-ggsave(sprintf("%s/x-better-10000.pdf", fig_path), g, width=180, height=120, unit="mm")
-```
-
-Full data
-
-```{r}
-g <- make_cooccurrence_plot(full_data_df_with_pred2, title="Number of true deferrals model x detects in Finnish data but model y does not",
-                            original_label=1, predicted_label.x=1, predicted_label.y=0)
-g
-ggsave(sprintf("%s/x-better-full-data.pdf", fig_path), g, width=180, height=120, unit="mm")
-```
 
 # old stuff
 
