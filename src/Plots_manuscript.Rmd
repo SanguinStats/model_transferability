@@ -72,7 +72,7 @@ data_sizes <- bind_rows(datalist) %>%
 
 datalist <- lapply(folders, load_files, target_name='/summary.csv')
 data <- bind_rows(datalist) %>%
-  select(modelcountry, datacountry, Sex, AUPR.value, AUPR.low, AUPR.high, model) %>%
+  select(modelcountry, datacountry, Sex, AUPR.value, AUPR.low, AUPR.high, AUROC.value, AUROC.low, AUROC.high, model) %>%
   rename("sex"="Sex")%>%
   mutate(modelcountry = factor(modelcountry, levels=c("AU", "AU2", "BE", "FI", "NL", "SA2", "SA")),datacountry = factor(datacountry, levels=c("AU", "AU2", "BE", "FI", "NL", "SA2", "SA")),modelcountry = case_when(modelcountry=='BE' ~ 'Belgium',modelcountry=='NL' ~ 'Netherlands',
                              modelcountry=='FI' ~ 'Finland',
@@ -92,29 +92,8 @@ data <- bind_rows(datalist) %>%
   mutate(AUPRadj.value = (AUPR.value - defrate_validate),
          AUPRadj.low   = AUPR.low - defrate_validate,
          AUPRadj.high  = AUPR.high  - defrate_validate)%>%
-  select(-defrate_train, -defrate_test, -defrate_validate, -AUPR.value, -AUPR.high, -AUPR.low)%>%
-  rename("value"="AUPRadj.value","low"="AUPRadj.low","high"="AUPRadj.high") %>% mutate(metric="Adjusted AUPR")
-
-data2 <- bind_rows(datalist) %>%
-  select(modelcountry, datacountry, Sex, AUROC.value, AUROC.low, AUROC.high, model) %>%
-  rename("sex"="Sex")%>%
-  mutate(modelcountry = case_when(modelcountry=='BE' ~ 'Belgium',
-                             modelcountry=='NL' ~ 'Netherlands',
-                             modelcountry=='FI' ~ 'Finland',
-                             modelcountry=='SA' ~ 'South Africa (EU cut off)',
-                             modelcountry=='SA2' ~ 'South Africa (Own cut off)',
-                             modelcountry=='AU' ~ 'Australia (Own cut off)', 
-                             modelcountry=='AU2' ~ 'Australia (EU cut off)'),
-         datacountry = case_when(datacountry=='BE' ~ 'Belgium',
-                             datacountry=='NL' ~ 'Netherlands',
-                             datacountry=='FI' ~ 'Finland',
-                             datacountry=='SA' ~ 'South Africa (EU cut off)',
-                             datacountry=='AU' ~ 'Australia (Own cut off)',
-                             datacountry=='AU2' ~ 'Australia (EU cut off)',
-                             datacountry=='SA2'~ 'South Africa (Own cut off)')) %>%
-  rename("value"="AUROC.value","low"="AUROC.low","high"="AUROC.high") %>% mutate(metric="AUROC")
-
-datafull <- rbind(data, data2)
+  select(-defrate_train, -defrate_test, -defrate_validate)%>%
+  rename("AUPR value"="AUPR.value","AUPR low"="AUPR.low","AUPR high"="AUPR.high","AUPRadj value"="AUPRadj.value","AUPRadj low"="AUPRadj.low","AUPRadj high"="AUPRadj.high","AUROC value"="AUROC.value","AUROC low"="AUROC.low", "AUROC high"="AUROC.high")
 ```
 
 # AUPR forest plots
@@ -125,7 +104,10 @@ dir.create(FolderName)
 
 countries <- c("Netherlands","Finland","South Africa (Own cut off)", "South Africa (EU cut off)","Australia (Own cut off)", "Australia (EU cut off)", "Belgium")
                
-datafull <- datafull %>% mutate(modelcountry = fct_relevel(modelcountry, "Australia (EU cut off)","Australia (Own cut off)","Belgium","Finland","Netherlands","South Africa (EU cut off)", "South Africa (Own cut off)"))
+dfadj <- data %>% select(model,sex,datacountry,modelcountry, matches("AUPRadj")) %>%
+  pivot_longer(-c(model, sex,datacountry,modelcountry)) %>%
+  separate(name, c("metric", "type"), sep=" ") %>%
+  pivot_wider(names_from="type") %>%  mutate(modelcountry = fct_relevel(modelcountry, "Australia (EU cut off)","Australia (Own cut off)","Belgium","Finland","Netherlands","South Africa (EU cut off)", "South Africa (Own cut off)"))
 
 datacountry.labs <- c("Data from \n the Netherlands","Data from \n Finland","Data from \n South Africa \n(Own cut off)", "Data from \n South Africa \n(EU cut off)","Data from \n Australia \n(Own cut off)", "Data from \n Australia \n(EU cut off)", "Data from \n Belgium")
 names(datacountry.labs) <- c("Netherlands","Finland","South Africa (Own cut off)", "South Africa (EU cut off)","Australia (Own cut off)", "Australia (EU cut off)", "Belgium")
@@ -133,20 +115,75 @@ names(datacountry.labs) <- c("Netherlands","Finland","South Africa (Own cut off)
 sex.labs <- c("Males", "Females")
 names(sex.labs) <- c("male", "female")
 
-aupradjplot <- ggplot(datafull, aes(x=value, 
+aupradjplot <- ggplot(dfadj, aes(x=value, 
              xmin=low, 
              xmax=high, 
              y = modelcountry,
-             color = modelcountry, shape=metric)) +
-  geom_pointrange(position = position_dodge(width= 0.0), size = 1, fatten = 1.0) +
+             color = modelcountry)) +
+  geom_pointrange(position = position_dodge(width= 0.6), size = 0.35, fatten = 0.8) +
   labs(title="Performance  by dataset of models trained in different countries",
-       shape = "Performance metric") +
+       color = "Model trained in") +
   coord_cartesian(xlim=c(0, 1)) + 
-  facet_grid(datacountry ~ sex, labeller = labeller(datacountry = datacountry.labs, sex = sex.labs)) + xlab("Performance") + ylab("Model trained in") + guides(color="none", shape = guide_legend(override.aes = list(size = 0.7)))+scale_y_discrete(limits = rev(levels(datafull$modelcountry)))
+  facet_grid(datacountry ~ sex, labeller = labeller(datacountry = datacountry.labs, sex = sex.labs)) + xlab("AUPR adjusted for deferral rate") + ylab("Model trained in") + theme(legend.position = "none")+scale_y_discrete(limits = rev(levels(dfadj$modelcountry)))
 
 FileName <- paste(FolderName, "/AUPRadj_forestplot.png",sep="")
 ggsave(aupradjplot, file = FileName, width = 9, height = 9)
 
+
+
+df <- data %>% select(sex,datacountry,modelcountry, matches("AUPR ")) %>%
+  pivot_longer(-c(sex,datacountry,modelcountry)) %>%
+  separate(name, c("metric", "type"), sep=" ") %>%
+  pivot_wider(names_from="type")%>%  mutate(modelcountry = fct_relevel(modelcountry, "Australia (EU cut off)","Australia (Own cut off)","Belgium","Finland","Netherlands","South Africa (EU cut off)", "South Africa (Own cut off)"))
+
+auprplot<-  ggplot(df, aes(x=value, 
+             xmin=low, 
+             xmax=high, 
+             y= modelcountry, 
+             color = modelcountry)) +
+  geom_pointrange(position = position_dodge(width= 0.6), size = 0.35, fatten = 0.8) +
+  labs(title="Performance  by dataset of models trained in different countries",
+       color = "Model trained in") +
+  coord_cartesian(xlim=c(0, 1)) + 
+  facet_grid(datacountry ~ sex, labeller = labeller(datacountry = datacountry.labs, sex = sex.labs)) + xlab("AUPR") + ylab("Model trained in") + theme(legend.position = "none") + scale_y_discrete(limits = rev(levels(df$modelcountry)))
+
+FileName <- paste(FolderName, "/AUPR_forestplot.png",sep="")
+ggsave(auprplot, file = FileName, width = 9, height = 9)
+```
+
+# AUROC forest plot
+
+```{r make figures}
+FolderName <- paste("~/Amber/SanguinStats/model_transferability/figures/Manuscript_plots")
+dir.create(FolderName)
+
+countries <- c("Netherlands","Finland","South Africa (Own cut off)", "South Africa (EU cut off)","Australia (Own cut off)", "Australia (EU cut off)", "Belgium")
+               
+
+datacountry.labs <- c("Data from \n the Netherlands","Data from \n Finland","Data from \n South Africa \n(Own cut off)", "Data from \n South Africa \n(EU cut off)","Data from \n Australia \n(Own cut off)", "Data from \n Australia \n(EU cut off)", "Data from \n Belgium")
+names(datacountry.labs) <- c("Netherlands","Finland","South Africa (Own cut off)", "South Africa (EU cut off)","Australia (Own cut off)", "Australia (EU cut off)", "Belgium")
+
+sex.labs <- c("Males", "Females")
+names(sex.labs) <- c("male", "female")
+
+df <- data %>% select(sex,datacountry,modelcountry, matches("AUROC ")) %>%
+  pivot_longer(-c(sex,datacountry,modelcountry)) %>%
+  separate(name, c("metric", "type"), sep=" ") %>%
+  pivot_wider(names_from="type")%>%  mutate(modelcountry = fct_relevel(modelcountry, "Australia (EU cut off)","Australia (Own cut off)","Belgium","Finland","Netherlands","South Africa (EU cut off)", "South Africa (Own cut off)"))
+
+aurocplot<-  ggplot(df, aes(x=value, 
+             xmin=low, 
+             xmax=high, 
+             y= modelcountry, 
+             color = modelcountry)) +
+  geom_pointrange(position = position_dodge(width= 0.6), size = 0.35, fatten = 0.8) +
+  labs(title="Performance  by dataset of models trained in different countries",
+       color = "Model trained in") +
+  coord_cartesian(xlim=c(0, 1)) + 
+  facet_grid(datacountry ~ sex, labeller = labeller(datacountry = datacountry.labs, sex = sex.labs)) + xlab("AUROC") + ylab("Model trained in") + theme(legend.position = "none") + scale_y_discrete(limits = rev(levels(df$modelcountry)))
+
+FileName <- paste(FolderName, "/AUROC_forestplot.png",sep="")
+ggsave(aurocplot, file = FileName, width = 9, height = 9)
 ```
 
 # Prediction data
