@@ -12,13 +12,12 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 #library(pROC)
 #library(boot)
-base_dir <- "~/FRCBS/Hb_predictor_container/results"
+base_dir <- "~/Amber/SanguinStats/Resultaten/results"
 fsummary <- function(df) df %>% mutate(across(where(is.character), as.factor)) %>% summary()
 countries <- c("Australia", "Belgium", "Finland", "Netherlands", "South-Africa", "Average") 
 countries2 <- sort(c(countries, "Australia2", "South-Africa2"))
-result_path <- "../results"
+result_path <- "~/Amber/SanguinStats/Resultaten/co-occurrence/"
 save_figs <- TRUE
-fig_path <- file.path(result_path, "figures/pdf")
 ```
 
 ## TODO
@@ -38,67 +37,68 @@ e.g. `docker cp kind_brahmagupta:/tmp/rf-validate-male.rds .`, where `kind_brahm
 # These are with sample size 10,000
 validate_subdirectories <- tribble(
   ~Data_country, ~Model, ~Subdirectory,
-  "Finland", "2don", "jarkko-2023-03-28-get-data-Australia_2don",
-  "Finland", "5don", "jarkko-2023-03-28-get-data-Australia_5don",
-  "Finland", "5don4hb", "jarkko-2023-03-28-get-data-Australia_5don4hb",
+  "Netherlands", "2don", "~/Amber/Data/SanguinStats/10k/",
+  "Netherlands", "5don", "~/Amber/Data/SanguinStats/10k/",
+  "Netherlands", "5don4hb", "~/Amber/Data/SanguinStats/10k/",
 )
 # These are with full data
 full_data_validate_subdirectories <- tribble(
   ~Data_country, ~Model, ~Subdirectory,
-  "Finland", "2don", "jarkko-2023-08-31-get-data-Australia_full_data_2don",
-  "Finland", "5don", "jarkko-2023-08-31-get-data-Australia_full_data_5don",
-  "Finland", "5don4hb", "jarkko-2023-08-31-get-data-Australia_full_data_5don4hb",
+  "Netherlands", "2don", "~/Amber/Data/SanguinStats/full/",
+  "Netherlands", "5don", "~/Amber/Data/SanguinStats/full/",
+  "Netherlands", "5don4hb", "~/Amber/Data/SanguinStats/full/",
 )
 # Read 10k datas
 validate_datas <- validate_subdirectories %>%
   mutate(sex=list(c("male", "female"))) %>% 
   unnest_longer(sex) %>%
-  mutate(data_file = file.path(base_dir, Subdirectory, sprintf("rf-validate-%s.rds", sex))) %>%
+  mutate(data_file = file.path(Subdirectory, sprintf("rf-validate-%s.rds", sex))) %>%
   mutate(df = map(data_file, function(filename) readRDS(filename)))
 # Read full datas
 full_data_validate_datas <- full_data_validate_subdirectories %>%
   mutate(sex=list(c("male", "female"))) %>% 
   unnest_longer(sex) %>%
-  mutate(data_file = file.path(base_dir, Subdirectory, sprintf("rf-validate-%s.rds", sex))) %>%
+  mutate(data_file = file.path(Subdirectory, sprintf("rf-validate-%s-full.rds", sex))) %>%
   mutate(df = map(data_file, function(filename) readRDS(filename)))
 ```
 
 
 ```{r Where the fitted models are stored}
+folder_trainedmodels <- "~/Amber/SanguinStats/Resultaten/trained_models"
 models <- tribble(~Model_country, ~Model, ~dir, ~file,
-                  "Finland", "2don", "jarkko-2023-01-17-model1-l-2" ,"svm-and-rf-models.zip",
-                  "Finland", "5don", "jarkko-2023-01-17-model2-l-5" ,"svm-and-rf-models.zip",
-                  "Finland", "5don4hb", "jarkko-2023-01-17-model3-l-5-hb4" ,"svm-and-rf-models.zip",
-                  "Netherlands", "2don", "amber-2023-01-31", "svm-and-rf-models-2don.zip",
-                  "Netherlands", "5don", "amber-2023-01-31", "svm-and-rf-models-5don.zip",
-                  "Netherlands", "5don4hb", "amber-2023-01-31", "svm-and-rf-models-5don4hb.zip",
-                  "Belgium", "2don", "belgium-2023-03-24", "svm-and-rf-models_Belgium_2don.zip",
-                  "Belgium", "5don", "belgium-2023-03-24", "svm-and-rf-models_Belgium_5don.zip",
-                  "Belgium", "5don4hb", "belgium-2023-03-24", "svm-and-rf-models_Belgium_5don4hb.zip",
+                  "Finland", "2don", "FI" ,"rf-models-fi-model1-l-2.zip",
+                  "Finland", "5don", "FI" ,"rf-models-fi-model2-l-5.zip" ,
+                  "Finland", "5don4hb", "FI" ,"rf-models-fi-model3-l-5-hb4.zip",
+                  "Netherlands", "2don", "NL", "svm-and-rf-models-NL-2don.zip",
+                  "Netherlands", "5don", "NL", "svm-and-rf-models-NL-5don.zip" ,
+                  "Netherlands", "5don4hb", "NL", "svm-and-rf-models-NL-5don4hb.zip",
+                  "Belgium", "2don", "BE", "svm-and-rf-models_Belgium_2don.zip",
+                  "Belgium", "5don", "BE", "svm-and-rf-models_Belgium_5don.zip",
+                  "Belgium", "5don4hb", "BE", "svm-and-rf-models_Belgium_5don4hb.zip",
                   # EU thresholds
-                  "Australia", "2don", "australia-2023-03-28-unified_threshold", "svm-and-rf-models_Australia_2don.zip",
-                  "Australia", "5don", "australia-2023-03-28-unified_threshold", "svm-and-rf-models_Australia_5don.zip",
-                  "Australia", "5don4hb", "australia-2023-03-28-unified_threshold", "svm-and-rf-models_Australia_5don4hb.zip",
+                  "Australia", "2don", "AU2", "svm-and-rf-models_Australia_2don.zip",
+                  "Australia", "5don", "AU2", "svm-and-rf-models_Australia_5don.zip",
+                  "Australia", "5don4hb", "AU2", "svm-and-rf-models_Australia_5don4hb.zip",
                   # Own thresholds
-                  "Australia2", "2don", "australia-2023-02-24", "svm-and-rf-models_Australia_2don.zip",
-                  "Australia2", "5don", "australia-2023-02-24", "svm-and-rf-models_Australia_5don.zip",
-                  "Australia2", "5don4hb", "australia-2023-02-24", "svm-and-rf-models_Australia_5don4hb.zip",
+                  "Australia2", "2don", "AU", "svm-and-rf-models_Australia_2don.zip",
+                  "Australia2", "5don", "AU", "svm-and-rf-models_Australia_5don.zip",
+                  "Australia2", "5don4hb", "AU", "svm-and-rf-models_Australia_5don4hb.zip",
                   # EU thresholds
-                  "South Africa", "2don", "south-africa-2023-02-28", "svm-and-rf-models_South_Africa_2don.zip",
-                  "South Africa", "5don", "south-africa-2023-02-28", "svm-and-rf-models_South_Africa_5don.zip",
-                  "South Africa", "5don4hb", "south-africa-2023-02-28", "svm-and-rf-models_South_Africa_5don4hb.zip",
+                  "South Africa", "2don", "SA", "svm-and-rf-models_South_Africa_2don.zip",
+                  "South Africa", "5don", "SA", "svm-and-rf-models_South_Africa_5don.zip",
+                  "South Africa", "5don4hb", "SA", "svm-and-rf-models_South_Africa_5don4hb.zip",
                   # South Africa's own thresholds
-                  "South Africa2", "2don", "south-africa-2023-04-05-unified_threshold", "svm-and-rf-models_South_Africa_2don_Own.zip",
-                  "South Africa2", "5don", "south-africa-2023-04-05-unified_threshold", "svm-and-rf-models_South_Africa_5don_Own.zip",
-                  "South Africa2", "5don4hb", "south-africa-2023-04-05-unified_threshold", "svm-and-rf-models_South_Africa_5don4hb_Own.zip"
+                  "South Africa2", "2don", "SA2", "svm-and-rf-models_South_Africa_2don_Own.zip",
+                  "South Africa2", "5don", "SA2", "svm-and-rf-models_South_Africa_5don_Own.zip",
+                  "South Africa2", "5don4hb", "SA2", "svm-and-rf-models_South_Africa_5don4hb_Own.zip"
 )
 models <- models %>% 
-  mutate(filename=file.path(base_dir, dir, file))
+  mutate(filename=file.path(folder_trainedmodels, dir, file))
 ```
 
 ```{r Function to read the models}
 read_model <- function(zipfilename) {
-  temp_dir <- tempdir()
+  temp_dir <- "~/Amber/SanguinStats/Resultaten/trained_models"
   cmd <- sprintf("unzip -o %s -d %s", zipfilename, temp_dir)
   #print(cmd)
   cat(sprintf("Reading models from %s\n", zipfilename))
@@ -186,23 +186,30 @@ full_data_recomputed_datas <- full_data_recomputed_datas %>%
 This uses still the old way of using the prediction.csv files outputted by the container.
 
 ```{r, eval=FALSE}
+folder_results <- "~/Amber/SanguinStats/Resultaten/results"
 subdirectories <- tribble(
   ~Model_country, ~Model, ~Subdirectory,
-  "Belgium", "2don", "jarkko-2023-03-24-Belgium_2don",
-  "Belgium", "5don", "jarkko-2023-03-24-Belgium_5don",
-  "Belgium", "5don4hb", "jarkko-2023-03-24-Belgium_5don4hb",
-  "South-Africa", "2don", "jarkko-2023-02-28-South_Africa_2don",
-  "South-Africa", "5don", "jarkko-2023-02-28-South_Africa_5don",
-  "South-Africa", "5don4hb", "jarkko-2023-02-28-South_Africa_5don4hb",
-  "Australia", "2don", "jarkko-2023-02-27-Australia_2don",
-  "Australia", "5don", "jarkko-2023-02-27-Australia_5don",
-  "Australia", "5don4hb", "jarkko-2023-02-27-Australia_5don4hb",
-  "Netherlands", "2don", "jarkko-2023-01-31-2don",
-  "Netherlands", "5don", "jarkko-2023-01-31-5don",
-  "Netherlands", "5don4hb", "jarkko-2023-01-31-5don4hb",
-  "Finland", "2don", "jarkko-2023-01-17-model1-l-2",
-  "Finland", "5don", "jarkko-2023-01-17-model2-l-5",
-  "Finland", "5don4hb", "jarkko-2023-01-17-model3-l-5-hb4"
+  "Belgium", "2don", "Model1-BE-NL",
+  "Belgium", "5don", "Model2-BE-NL",
+  "Belgium", "5don4hb", "Model3-BE-NL",
+  "South-Africa", "2don", "Model1-SA-NL",
+  "South-Africa", "5don", "Model2-SA-NL",
+  "South-Africa", "5don4hb", "Model3-SA-NL",
+    "South-Africa2", "2don", "Model1-SA2-NL",
+  "South-Africa2", "5don", "Model2-SA2-NL",
+  "South-Africa2", "5don4hb", "Model3-SA2-NL",
+  "Australia", "2don", "Model1-AU-NL",
+  "Australia", "5don", "Model2-AU-NL",
+  "Australia", "5don4hb", "Model3-AU-NL",
+    "Australia2", "2don", "Model1-AU2-NL",
+  "Australia2", "5don", "Model2-AU2-NL",
+  "Australia2", "5don4hb", "Model3-AU2-NL",
+  "Netherlands", "2don", "Model1-NL-NL",
+  "Netherlands", "5don", "Model2-NL-NL",
+  "Netherlands", "5don4hb", "Model3-NL-NL",
+  "Finland", "2don", "Model1-FI-NL",
+  "Finland", "5don", "Model2-FI-NL",
+  "Finland", "5don4hb", "Model3-FI-NL"
 )
 ```
 
@@ -213,8 +220,8 @@ In file docker-apps-plumber.R I permute the rows of the prediction.csv file, hen
 
 ```{r, eval=FALSE}
 datas2 <- subdirectories %>%
-  mutate(Data_country = "Finland",
-         prediction_file = file.path(base_dir, Subdirectory, "prediction.csv"),
+  mutate(Data_country = "Netherlands",
+         prediction_file = file.path(folder_results, Subdirectory, "prediction.csv"),
          df = map(prediction_file, function(filename) read_csv(filename, show_col_types = FALSE)))
 ```
 
@@ -238,9 +245,9 @@ Sample size was 10 000 and the validate set size was 1600. This number of observ
 Which models to show in plots.
 
 ```{r}
-models <- c("2don", "5don", "5don4hb")
+models <- c("5don4hb")
 #models <- c("5don4hb")
-width=180
+width=70
 height=120
 ```
 
@@ -279,7 +286,7 @@ make_cooccurrence_plot <- function(df, title=NULL, original_label=1, predicted_l
     filter(!Model_country %in% c("Australia2", "South Africa2"))  # Don't show results for countries' own cutoffs
   countries <- unique(tmp$Model_country)
   models <- unique(tmp$Model)
-  number_of_countries <- length(models)
+  number_of_countries <- 5
   number_of_models <- length(models)
   cross_product <- inner_join(tmp, tmp, by=c("Model", "sex", "original_label", "n"), 
                               relationship = "many-to-many") %>%
@@ -300,14 +307,14 @@ make_cooccurrence_plot <- function(df, title=NULL, original_label=1, predicted_l
     summarise(deferrals = sum(original_label), .groups="drop") %>%
     select(-Model_country) %>%
     distinct()
-  df2 <- cooccurrence %>%   # Compute success ratio
+  df2 <<- cooccurrence %>%   # Compute success ratio
     left_join(number_of_deferrals, by=c("sex", "Model")) %>%
     mutate(percentage = 100*n/deferrals)
-  df2 <- df2 %>%
+  df2 <<- df2 %>%
     mutate(Model_country.y = fct_rev(Model_country.y), Model_country.x = as.factor(Model_country.x)) %>% 
     mutate(xi = as.numeric(Model_country.x), yi=as.numeric(Model_country.y)) 
   
-  if (symmetric) df2 <- df2 %>%
+  if (symmetric) df2 <<- df2 %>%
     filter(xi + yi >= (number_of_countries+1))   # Take only the upper triangle and diagonal
   # There is some aligment/NA problem in geom_raster, hence I explicitly insert one NA cell.
   existing <- df2 %>% select(Model, Model_country.x, Model_country.y, sex) %>% distinct()
@@ -319,7 +326,8 @@ make_cooccurrence_plot <- function(df, title=NULL, original_label=1, predicted_l
     ggplot(aes(x=Model_country.x, y=Model_country.y, fill=.data[[fill_name]])) + 
     geom_raster(na.rm=TRUE) +
     geom_text(aes(label=n), color="white", size=3, na.rm=TRUE) +
-    #scale_fill_continuous(na.value=NULL) +
+    scale_y_discrete(limits=rev)+
+    scale_fill_continuous(na.value="transparent") +
     labs(x="Model x country", y="Model y country", 
          title=title, 
          #subtitle=sprintf("n=%i", number_of_observations), 
@@ -340,9 +348,9 @@ make_cooccurrence_plot <- function(df, title=NULL, original_label=1, predicted_l
 ```{r}
 g <- make_cooccurrence_plot(df_with_pred %>% filter(Model %in% models),
                             original_label=NULL, predicted_label.x=NULL, predicted_label.y=NULL, 
-                            title="Number of attempts labeled the same way in Finnish data")
+                            title="Number of attempts \nlabeled the same way \nin Dutch data")
 g
-if (save_figs) ggsave(sprintf("%s/same-labels-predicted-10000.pdf", fig_path), g, width=width, height=height, unit="mm")
+if (save_figs) ggsave(sprintf("%s/same-labels-predicted-10000.png", result_path), g, width=width, height=height, unit="mm")
 ```
 
 ### Agreement
@@ -351,18 +359,18 @@ if (save_figs) ggsave(sprintf("%s/same-labels-predicted-10000.pdf", fig_path), g
 
 ```{r}
 g <- make_cooccurrence_plot(df_with_pred %>% filter(Model %in% models), 
-                            title="Number of true deferrals that both models detect in Finnish data")
+                            title="Number of true deferrals\nthat both models detect\nin Dutch data")
 g
-if (save_figs) ggsave(sprintf("%s/cooccurrences-of-true-positives-10000.pdf", fig_path), g, width=width, height=height, unit="mm")
+if (save_figs) ggsave(sprintf("%s/cooccurrences-of-true-positives-10000.png", result_path), g, width=width, height=height, unit="mm")
 ```
 
 Full data
 
 ```{r}
 g <- make_cooccurrence_plot(full_data_df_with_pred %>% filter(Model %in% models), 
-                            title="Number of true deferrals both models\ndetect in Finnish data")
+                            title="Number of true deferrals\nboth models detect\nin Dutch data")
 g
-if (save_figs) ggsave(sprintf("%s/cooccurrences-of-true-positives-full-data.pdf", fig_path), g, width=width, height=height, unit="mm")
+if (save_figs) ggsave(sprintf("%s/cooccurrences-of-true-positives-full-data.png", result_path), g, width=width, height=height, unit="mm")
 ```
 
 
@@ -371,18 +379,18 @@ if (save_figs) ggsave(sprintf("%s/cooccurrences-of-true-positives-full-data.pdf"
 10,000 donors
 
 ```{r}
-g <- make_cooccurrence_plot(df_with_pred %>% filter(Model %in% models), 
-                            title="Number of true deferrals model x detects in Finnish data but model y does not",
+g <- make_cooccurrence_plot(df_with_pred %>% filter(Model %in% models),
+                            title="Number of true deferrals\nmodel x detects in Dutch data \nbut model y does not",
                             original_label=1, predicted_label.x=1, predicted_label.y=0)
 g
-if (save_figs) ggsave(sprintf("%s/x-better-10000.pdf", fig_path), g, width=width, height=height, unit="mm")
+if (save_figs) ggsave(sprintf("%s/x-better-10000.png", result_path), g, width=width, height=height, unit="mm")
 ```
 
 Full data
 
 ```{r}
 g <- make_cooccurrence_plot(full_data_df_with_pred %>% filter(Model %in% models), 
-                            title="Number of true deferrals model x detects in\nFinnish data but model y does not",
+                            title="Number of true deferrals model x detects in\nDutch data but model y does not",
                             original_label=1, predicted_label.x=1, predicted_label.y=0)
 g# + coord_fixed()
 if (save_figs) ggsave(sprintf("%s/x-better-full-data.pdf", fig_path), g, width=width, height=height, unit="mm")

@@ -16,7 +16,7 @@ format:
 
 ```{r warning=F, message=F}
 #| label: packages
-#| code-summary: "Loading libraries"
+#| code-fold: false
 
 library(stats)
 library(randomForest)
@@ -24,7 +24,11 @@ library(ROCR)
 library(kableExtra)
 library(formatdown)
 
-# Functions
+```
+
+```{r}
+#| label: decimals
+#| include: false
 
 # function to transform a numeric to a string with a fixed nr of decimals
 fix_decimals<-function(x, digits=2, big_mark=NULL) gsub('\\$', '', format_decimal(x, digits=digits, big_mark = big_mark))
