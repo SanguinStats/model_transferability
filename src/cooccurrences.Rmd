@@ -58,7 +58,7 @@ validate_datas <- validate_subdirectories %>%
 full_data_validate_datas <- full_data_validate_subdirectories %>%
   mutate(sex=list(c("male", "female"))) %>% 
   unnest_longer(sex) %>%
-  mutate(data_file = file.path(Subdirectory, sprintf("rf-validate-%s-full.rds", sex))) %>%
+  mutate(data_file = file.path(Subdirectory, sprintf("rf-validate-%s.rds", sex))) %>%
   mutate(df = map(data_file, function(filename) readRDS(filename)))
 ```
 
@@ -174,9 +174,11 @@ write_tsv(tmp, file.path(result_path, "data_sizes.tsv"))
 ```
 
 ```{r Compute the predictions on full data}
+
+
 full_data_recomputed_datas <- full_data_validate_datas %>% 
   select(Data_country, Model, sex, validate=df) %>%
-  full_join(models %>% select(Model_country, Model, sex, fit), by = join_by(Model, sex))
+  full_join(models %>% select(Model_country, Model, sex, fit), by = join_by("Model", "sex"))
 full_data_recomputed_datas <- full_data_recomputed_datas %>%
   mutate(df = map2(fit, validate, mypredict))
 ```
@@ -353,6 +355,14 @@ g
 if (save_figs) ggsave(sprintf("%s/same-labels-predicted-10000.png", result_path), g, width=width, height=height, unit="mm")
 ```
 
+```{r}
+g <- make_cooccurrence_plot(full_data_df_with_pred %>% filter(Model %in% models),
+                            original_label=NULL, predicted_label.x=NULL, predicted_label.y=NULL, 
+                            title="Number of attempts \nlabeled the same way \nin Dutch data")
+g
+if (save_figs) ggsave(sprintf("%s/same-labels-predicted-full.png", result_path), g, width=width, height=height, unit="mm")
+```
+
 ### Agreement
 
 10,000 donors
@@ -393,6 +403,6 @@ g <- make_cooccurrence_plot(full_data_df_with_pred %>% filter(Model %in% models)
                             title="Number of true deferrals model x detects in\nDutch data but model y does not",
                             original_label=1, predicted_label.x=1, predicted_label.y=0)
 g# + coord_fixed()
-if (save_figs) ggsave(sprintf("%s/x-better-full-data.pdf", fig_path), g, width=width, height=height, unit="mm")
+if (save_figs) ggsave(sprintf("%s/x-better-full-data.pdf", result_path), g, width=width, height=height, unit="mm")
 ```
 
