@@ -125,6 +125,7 @@ aupradjplot <- ggplot(dfadj, aes(x=value,
        color = "Model trained in") +
   coord_cartesian(xlim=c(0, 1)) + 
   facet_grid(datacountry ~ sex, labeller = labeller(datacountry = datacountry.labs, sex = sex.labs)) + xlab("AUPR adjusted for deferral rate") + ylab("Model trained in") + theme(legend.position = "none")+scale_y_discrete(limits = rev(levels(dfadj$modelcountry)))
+aupradjplot <- annotate_figure(aupradjplot, right = text_grob("Model evaluated in", rot = -90, size = 10, x = 0.7, vjust=1))
 
 FileName <- paste(FolderName, "/AUPRadj_forestplot.png",sep="")
 ggsave(aupradjplot, file = FileName, width = 9, height = 9)
@@ -146,6 +147,7 @@ auprplot<-  ggplot(df, aes(x=value,
        color = "Model trained in") +
   coord_cartesian(xlim=c(0, 1)) + 
   facet_grid(datacountry ~ sex, labeller = labeller(datacountry = datacountry.labs, sex = sex.labs)) + xlab("AUPR") + ylab("Model trained in") + theme(legend.position = "none") + scale_y_discrete(limits = rev(levels(df$modelcountry)))
+auprplot <- annotate_figure(auprplot, right = text_grob("Model evaluated in", rot = -90, size = 10, x = 0.7, vjust=1))
 
 FileName <- paste(FolderName, "/AUPR_forestplot.png",sep="")
 ggsave(auprplot, file = FileName, width = 9, height = 9)
@@ -181,6 +183,7 @@ aurocplot<-  ggplot(df, aes(x=value,
        color = "Model trained in") +
   coord_cartesian(xlim=c(0, 1)) + 
   facet_grid(datacountry ~ sex, labeller = labeller(datacountry = datacountry.labs, sex = sex.labs)) + xlab("AUROC") + ylab("Model trained in") + theme(legend.position = "none") + scale_y_discrete(limits = rev(levels(df$modelcountry)))
+aurocplot <- annotate_figure(aurocplot, right = text_grob("Model evaluated in", rot = -90, size = 10, x = 0.7, vjust=1))
 
 FileName <- paste(FolderName, "/AUROC_forestplot.png",sep="")
 ggsave(aurocplot, file = FileName, width = 9, height = 9)
@@ -252,6 +255,9 @@ countries <- c("Netherlands","Finland","South Africa (Own cut off)", "South Afri
 
 
   }
+  
+  eval(parse(text=paste0("Data_",countries_short[i]," <- Model3")))
+
 }
 
 curvedata <- rbind(Data_BE, Data_NL, Data_AU, Data_AU2, Data_FI, Data_SA, Data_SA2)
@@ -260,6 +266,8 @@ datacountry.labs <- c("Data from \n the Netherlands","Data from \n Finland","Dat
 names(datacountry.labs) <- countries_short
 
 p<-ggplot(data=curvedata, aes(x,y))+geom_line(aes(col=modelcountry))+ylim(0,1)+xlim(0,1)+facet_grid(datacountry ~ sex, labeller = labeller(datacountry = datacountry.labs, sex = sex.labs)) + ggtitle("AUPR curves of different models on country datasets") + labs(col = "Model trained in") + xlab("Recall") + ylab("Precision") + guides(guide = guide_legend(reverse=T))
+p <- annotate_figure(p, right = text_grob("Model evaluated in", rot = -90, size = 10, x = 0.7, vjust=1))
+
 ggsave(p, file=paste0(FolderName, "/AUPR_curves.png", sep = ""), height =9, width = 7)
 ```
 
@@ -321,14 +329,21 @@ data_maa <- data_shap %>%
   ungroup()
 ```
 
+## SHAP plot
+ 
 ```{r SHAP plots}
+
+datacountry.labs <- c("Data from \n the Netherlands","Data from \n Finland","Data from \n South Africa \n(Own cut off)", "Data from \n South Africa \n(EU cut off)","Data from \n Australia \n(Own cut off)", "Data from \n Australia \n(EU cut off)", "Data from \n Belgium")
+names(datacountry.labs) <- c("Netherlands","Finland","South Africa (Own cut off)", "South Africa (EU cut off)","Australia (Own cut off)", "Australia (EU cut off)", "Belgium")
+
   plt <- ggplot(data=data_maa, aes(x = reorder(variable, avg_maa))) +facet_grid(datacountry ~ sex, labeller = labeller(datacountry = datacountry.labs, sex = sex.labs))+
       geom_line(mapping=aes(y = maa, group = modelcountry, color = modelcountry), linewidth = 1) +
       geom_point(mapping=aes(y = maa, color = modelcountry, shape = modelcountry), size = 2) +
-      geom_col(mapping=aes(y = avg_maa), alpha = 0.2, position = 'identity') +
+      geom_col(mapping=aes(y = avg_maa), alpha = 0.1, position = 'identity') +
       scale_shape_manual(values=c(18, 15, 8, 17, 16, 6, 13)) +
       coord_flip() + xlab("Variable") + ylab("Mean absolute attribution")+ theme_bw()+ ggtitle("Variable importance in different models on datasets from various countries")+
       labs(color = "Model from", shape = "Model from") + theme(axis.text.x=element_text(size=8))
+plt <- annotate_figure(plt, right = text_grob("Model evaluated in", rot = -90, size = 10, x = -9.75, vjust=1))
 
 ggsave(plt, file = paste0(FolderName, "/SHAP.jpg"), height = 13, width = 13)
 ```
