@@ -112,7 +112,7 @@ dfadj <- data %>% select(model,sex,datacountry,modelcountry, matches("AUPRadj"))
 datacountry.labs <- c("Data from \n the Netherlands","Data from \n Finland","Data from \n South Africa \n(Own cut off)", "Data from \n South Africa \n(EU cut off)","Data from \n Australia \n(Own cut off)", "Data from \n Australia \n(EU cut off)", "Data from \n Belgium")
 names(datacountry.labs) <- c("Netherlands","Finland","South Africa (Own cut off)", "South Africa (EU cut off)","Australia (Own cut off)", "Australia (EU cut off)", "Belgium")
 
-sex.labs <- c("Males", "Females")
+sex.labs <- c("Male", "Female")
 names(sex.labs) <- c("male", "female")
 
 aupradjplot <- ggplot(dfadj, aes(x=value, 
@@ -165,7 +165,7 @@ countries <- c("Netherlands","Finland","South Africa (Own cut off)", "South Afri
 datacountry.labs <- c("Data from \n the Netherlands","Data from \n Finland","Data from \n South Africa \n(Own cut off)", "Data from \n South Africa \n(EU cut off)","Data from \n Australia \n(Own cut off)", "Data from \n Australia \n(EU cut off)", "Data from \n Belgium")
 names(datacountry.labs) <- c("Netherlands","Finland","South Africa (Own cut off)", "South Africa (EU cut off)","Australia (Own cut off)", "Australia (EU cut off)", "Belgium")
 
-sex.labs <- c("Males", "Females")
+sex.labs <- c("Male", "Female")
 names(sex.labs) <- c("male", "female")
 
 df <- data %>% select(sex,datacountry,modelcountry, matches("AUROC ")) %>%
