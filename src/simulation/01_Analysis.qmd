@@ -13,7 +13,6 @@ format:
 
 # R Initialization and defining general Functions
 
-
 ```{r warning=F, message=F}
 #| label: packages
 #| code-summary: "Loading libraries"
@@ -31,7 +30,7 @@ fix_decimals<-function(x, digits=2, big_mark=NULL) gsub('\\$', '', format_decima
 
 ```
 
-```{r} 
+```{r}
 #| label: create datasets function
 #| code-summary: "function: createDatasets()"
 createDatasets<-function(propdef=0, printresults=F){
@@ -395,7 +394,6 @@ nrsimulations <- 300
 set.seed(1)
 ```
 
-
 # Description of a hypothetical donor population
 
 ```{r}
@@ -411,10 +409,9 @@ p3<- pnorm(threshold, mean=PopMean, sqrt(PopSd^2+MeasSds[2]^2))
 
 createNewTestDataset()
 ```
-To evaluate the behaviour of prediction models for donor deferral we simulated a hypothetical donor population with mean Hb level of `r fix_decimals(PopMean,1)` and a standard deviation of `r fix_decimals(PopSd,2)` mmol/L. 
-We also presumed that the Hb level of donors would be measured with a measurement error having a standard deviation of `r fix_decimals(MeasSds[1],2)` mmol/L (without any bias).\
-With a deferral threshold of `r threshold` this population should have `r fix_decimals(p1*100,1)`% of its donors deferred for a low Hb level. However, with a measurement uncertainty of `r fix_decimals(MeasSds[1],2)` mmol/L there will be on average a proportion of `r fix_decimals(p2*100,1)`% of measurements below the deferral threshold (see @fig-distr). In case the measurement variation would be only half as big (`r fix_decimals(MeasSds[2], 2)` mmol/L) there would on average only be a deferral rate of `r fix_decimals(p3*100,1)`%.
 
+To evaluate the behaviour of prediction models for donor deferral we simulated a hypothetical donor population with mean Hb level of `r fix_decimals(PopMean,1)` and a standard deviation of `r fix_decimals(PopSd,2)` mmol/L. We also presumed that the Hb level of donors would be measured with a measurement error having a standard deviation of `r fix_decimals(MeasSds[1],2)` mmol/L (without any bias).\
+With a deferral threshold of `r threshold` this population should have `r fix_decimals(p1*100,1)`% of its donors deferred for a low Hb level. However, with a measurement uncertainty of `r fix_decimals(MeasSds[1],2)` mmol/L there will be on average a proportion of `r fix_decimals(p2*100,1)`% of measurements below the deferral threshold (see @fig-distr). In case the measurement variation would be only half as big (`r fix_decimals(MeasSds[2], 2)` mmol/L) there would on average only be a deferral rate of `r fix_decimals(p3*100,1)`%.
 
 ```{r}
 #| label: fig-distr
@@ -436,11 +433,9 @@ With a deferral threshold of `r threshold` this population should have `r fix_de
 
 ```
 
-
 # Using a Random Forest model to predict donor deferral
 
-We simulated a dataset of `r fix_decimals(n,digits=0, big_mark=",")` donations from the above population of which the Hb levels were measured with a standard deviation of `r fix_decimals(MeasSds[1],2)`  mmol/L where we did two subsequent measurements. A random forest model was trained on `r trainprop*100`% of the data to predict donor deferral of the second Hb measurement using the Hb levels from the first measurement as a predictor. The quality of the deferral prediction model was expressed as the Corrected Area Under the Precision Recall curve (cAUPR) and as the area under the Receiver Operating Characteristic curve (AUROC) which were derived from applying the model to a test data set consisting of the remaining `r testprop*100`% of the data. The correction applied for the AUPR estimate consists of a subtraction of the overall deferral rate, as reported earlier @vinkenoog_international_2023. 
-When comparing AUPR estimates from models applied in settings with different deferral rates these will be biased by the deferral rate as this is the baseline value for the AUPR estimate (at 100% recall). By subtracting the overall deferral rate a more objective reflection of what a model has actually learned will be obtained. @fig-AUPRcurve shows the (uncorrected) precision recall curve and ROC curve for a training and test dataset. @fig-AUROCurve shows the ROC curves for the same training and test datasets. 
+We simulated a dataset of `r fix_decimals(n,digits=0, big_mark=",")` donations from the above population of which the Hb levels were measured with a standard deviation of `r fix_decimals(MeasSds[1],2)` mmol/L where we did two subsequent measurements. A random forest model was trained on `r trainprop*100`% of the data to predict donor deferral of the second Hb measurement using the Hb levels from the first measurement as a predictor. The quality of the deferral prediction model was expressed as the Corrected Area Under the Precision Recall curve (cAUPR) and as the area under the Receiver Operating Characteristic curve (AUROC) which were derived from applying the model to a test data set consisting of the remaining `r testprop*100`% of the data. The correction applied for the AUPR estimate consists of a subtraction of the overall deferral rate, as reported earlier @vinkenoog_international_2023. When comparing AUPR estimates from models applied in settings with different deferral rates these will be biased by the deferral rate as this is the baseline value for the AUPR estimate (at 100% recall). By subtracting the overall deferral rate a more objective reflection of what a model has actually learned will be obtained. @fig-AUPRcurve shows the (uncorrected) precision recall curve and ROC curve for a training and test dataset. @fig-AUROCurve shows the ROC curves for the same training and test datasets.
 
 ```{r}
 #| label: fit model and calculate statistics
@@ -452,8 +447,6 @@ When comparing AUPR estimates from models applied in settings with different def
 bestmtry <- tuneRF(data_train,data_train$deferral,stepFactor=1.20, improve = 0.010, trace=T, plot= F) 
 RFmodel <- randomForest(deferral~meas1,data=data_train)
 ```
-
-
 
 ```{r}
 #| label: performance 
@@ -476,7 +469,6 @@ test_perf2a = performance(perf_test_data, "tpr","fpr")
 test_aucpr = performance(perf_test_data, "aucpr")
 test_auc = performance(perf_test_data, "auc")
 ```
-
 
 ```{r}
 #| label: fig-AUPRcurve
@@ -504,9 +496,7 @@ legend("bottomright", c(paste0("Training data (AUC=",round(train_auc@y.values[[1
 
 # Simulation with a replication of the RF fits
 
-We repeated the RF fitting procedure `r nrsimulations` times for various deferral rates (`r substr(paste(paste0(props*100,"%,"), collapse =" "), 1, nchar(paste(paste0(props*100,"%,"), collapse =" "))-1)`) as shown in @fig-defrates. Deferral rates were set by adjusting the population mean Hb level accordingly. @fig-AUPR and @fig-AUROC show the cAUPR and AUROC estimates for RF models trained and tested at various deferral rates. These figures clearly show that both the cAUPR and AUROC estimates increase with an increase in donor deferral rate. Also, these figures show that the cAUPR is more sensitive to changes between the models tested at various deferral rates. This is because the AUPR is sensitive changes in the positive predictive value (or precision) of the model whereas the AUROC is not. This is the main reason that AUPR performance measures are recommended for evaluating models with unbalanced binary class outcomes @saito_precision-recall_2015. 
-In @fig-AUPRexchange the AUPR estimates for RF models for various deferral rates are shown again, but now the results for models trained at all deferral rate levels applied to all deferral rate test data are shown as well. These results are provided in numerical form in @tbl-cAUPR. @fig-AUROCexchange and @tbl-AUROC provide the same information for AUROC estimates. From @fig-AUPRexchange and @fig-AUROCexchange it can be found that models trained on data sets with higher deferral rates generally have a (slightly) better performance than model trained on dataset with lower deferral rates. @fig-AUPRbothmeaserr and @fig-AUROCbothmeaserr show the result of applying these models to test datasets with a lower measurement error (`r MeasSds[2]` instead of `r fix_decimals(MeasSds[1],2)` mmol/L) but identical preset deferral rates. These figures clearly show the increase in performance of the prediction models when measurements are more accurate. The data presented in these figures is also provided in @tbl-cAUPR and @tbl-AUROC.
-
+We repeated the RF fitting procedure `r nrsimulations` times for various deferral rates (`r substr(paste(paste0(props*100,"%,"), collapse =" "), 1, nchar(paste(paste0(props*100,"%,"), collapse =" "))-1)`) as shown in @fig-defrates. Deferral rates were set by adjusting the population mean Hb level accordingly. @fig-AUPR and @fig-AUROC show the cAUPR and AUROC estimates for RF models trained and tested at various deferral rates. These figures clearly show that both the cAUPR and AUROC estimates increase with an increase in donor deferral rate. Also, these figures show that the cAUPR is more sensitive to changes between the models tested at various deferral rates. This is because the AUPR is sensitive changes in the positive predictive value (or precision) of the model whereas the AUROC is not. This is the main reason that AUPR performance measures are recommended for evaluating models with unbalanced binary class outcomes @saito_precision-recall_2015. In @fig-AUPRexchange the AUPR estimates for RF models for various deferral rates are shown again, but now the results for models trained at all deferral rate levels applied to all deferral rate test data are shown as well. These results are provided in numerical form in @tbl-cAUPR. @fig-AUROCexchange and @tbl-AUROC provide the same information for AUROC estimates. From @fig-AUPRexchange and @fig-AUROCexchange it can be found that models trained on data sets with higher deferral rates generally have a (slightly) better performance than model trained on dataset with lower deferral rates. @fig-AUPRbothmeaserr and @fig-AUROCbothmeaserr show the result of applying these models to test datasets with a lower measurement error (`r MeasSds[2]` instead of `r fix_decimals(MeasSds[1],2)` mmol/L) but identical preset deferral rates. These figures clearly show the increase in performance of the prediction models when measurements are more accurate. The data presented in these figures is also provided in @tbl-cAUPR and @tbl-AUROC.
 
 ```{r}
 #| label: analyse population means
@@ -635,7 +625,6 @@ kable(auprtable,
       )%>% add_header_above(c(" " = 1,"Test 1%"=2, "Test 2%"=2, "Test 4%"=2, "Test 8%"=2, "Test 16%"=2)) %>% pack_rows(index = c("Measurement error 0.50 mmol/L" = 5, "Measurement error 0.25 mmol/L" = 5))
 ```
 
-
 ```{r}
 #| label: fig-AUPRbothmeaserr
 #| fig-cap: Mean area under the corrected precision-recall curve (cAUPR) and the spread in the estimates for the individual training and test data sets as a function of the proportion of deferrals. Models developed on training data at each of the deferral proportion levels are applied on all test datasets. In addition, cAUPR estimates for the prediction models are shown when applied to test datasets with lower measurement error (0.25 mmol/L).
@@ -700,7 +689,6 @@ kable(auroctable,
       row.names=T
 )%>% add_header_above(c(" " = 1,"Test 1%"=2, "Test 2%"=2, "Test 4%"=2, "Test 8%"=2, "Test 16%"=2)) %>% pack_rows(index = c("Measurement error 0.50 mmol/L" = 5, "Measurement error 0.25 mmol/L" = 5))
 ```
-
 
 ```{r}
 #| label: fig-AUROCbothmeaserr
