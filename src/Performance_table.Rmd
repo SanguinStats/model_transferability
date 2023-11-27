@@ -1,0 +1,70 @@
+---
+title: "Model transferability (AUPR)"
+author: "A. Meulenbeld"
+date: "28-2-2023"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+load_files <- function(folder, target_name) {
+  info <- str_split(folder, '-', simplify=TRUE)       # country, size
+  file <- paste0(path, folder, target_name)
+  data <- read.csv(file) %>%
+    mutate(model = info[1],
+           modelcountry = info[2],
+           datacountry = info[3])
+  return(data)
+}
+```
+
+## R Markdown
+
+```{r setup}
+library(tidyverse)
+```
+
+```{r load models and data}
+path <- "~/Amber/SanguinStats/Resultaten/results/"
+folders <- list.dirs(path, full.names=FALSE, recursive=FALSE)
+folders <- folders[grepl("Model3", folders)]
+
+datalist <- lapply(folders, load_files, target_name='/prediction.csv')
+
+for(i in 1:length(datalist)){
+  colnames(datalist[[i]])[1] <- "Id"
+}
+
+data_predictions <- bind_rows(datalist) %>%
+  distinct() %>%
+  mutate(modelcountry = case_when(modelcountry=='BE' ~ 'Belgium',
+                             modelcountry=='NL' ~ 'Netherlands',
+                             modelcountry=='FI' ~ 'Finland',
+                             modelcountry=='SA' ~ 'South Africa (EU cut off)',
+                             modelcountry=='SA2' ~ 'South Africa (Own cut off)',
+                             modelcountry=='AU' ~ 'Australia (Own cut off)', 
+                             modelcountry=='AU2' ~ 'Australia (EU cut off)'),
+         datacountry = case_when(datacountry=='BE' ~ 'Belgium',
+                             datacountry=='NL' ~ 'Netherlands',
+                             datacountry=='FI' ~ 'Finland',
+                             datacountry=='SA' ~ 'South Africa (EU cut off)',
+                             datacountry=='AU' ~ 'Australia (Own cut off)',
+                             datacountry=='AU2' ~ 'Australia (EU cut off)',
+                             datacountry=='SA2'~ 'South Africa (Own cut off)'))%>%
+  select(datacountry, modelcountry, sex, original_label, predicted_label)
+```
+
+```{r}
+males <- data_predictions %>% filter(sex=="male")%>% group_by(modelcountry, datacountry) %>% summarise(observed = sum(original_label==1), predicted = sum(predicted_label==1))
+
+females <- data_predictions %>% filter(sex=="female")%>% group_by(modelcountry, datacountry) %>% summarise(observed = sum(original_label==1), predicted = sum(predicted_label==1))
+
+```
+
+```{r}
+males_FPFN <- data_predictions %>% filter(sex=="male")%>% group_by(modelcountry, datacountry) %>% summarise(fp = sum(original_label==0 & predicted_label == 1), fn = sum(predicted_label==0 & original_label == 1))
+
+females_FPFN <- data_predictions %>% filter(sex=="female")%>% group_by(modelcountry, datacountry) %>% summarise(fp = sum(original_label==0 & predicted_label == 1), fn = sum(predicted_label==0 & original_label == 1))
+
+```

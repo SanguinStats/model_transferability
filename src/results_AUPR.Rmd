@@ -26,7 +26,7 @@ library(tidyverse)
 ```
 
 ```{r load models and data}
-path <- "C:/Users/meule01a/OneDrive - Sanquin/A4 Project SanguinStats (OD)/07 Resultaten/results/"
+path <- "~/Amber/SanguinStats/Resultaten/results/"
 folders <- list.dirs(path, full.names=FALSE, recursive=FALSE)
 
 datalist <- lapply(folders, load_files, target_name='/sizes.csv')
