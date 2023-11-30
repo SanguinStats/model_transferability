@@ -1,5 +1,5 @@
 ---
-title: "Supplementary materials to the paper “Machine learning prediction models for donor Hb deferral: can we use the same models across countries?”"
+title: "Supplementary materials to the paper “Random Forest Haemoglobin Deferral Prediction Models: Can we use the same prediction model across countries?”"
 authors: Amber Meulenbeld, Jarkko Toivonen, Tinus Brits, Ronel Swanevelder, Dorien de Clippel, Veerle Compernolle, Surendra Karki, Marijke Welvaert, Katja van den Hurk, Joost van Rosmalen, Emmanuel Lesaffre, Mart Janssen and Mikko Arvas
 bibliography: bibliography.bib
 csl: vox-sanguinis.csl
