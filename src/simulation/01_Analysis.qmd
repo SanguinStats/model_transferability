@@ -416,7 +416,7 @@ testprop <-0.20 # proportion test data
 nrsimulations <- 300
 
 # set seed value
-set.seed(3)
+set.seed(1000)
 ```
 
 # Description of a hypothetical donor population
@@ -504,7 +504,7 @@ train_perf2 = performance(perf_train_data, "sens","spec")
 train_perf2a = performance(perf_train_data, "tpr","fpr")
 train_aucpr = performance(perf_train_data, "aucpr")
 train_auc = performance(perf_train_data, "auc")
-
+train_aucpr@y.values[[1]]
 xgbpred_test <- predict(xgb1,dtest)
 perf_test_data = prediction(xgbpred_test, data_test$deferral)
 test_perf = performance(perf_test_data, "prec","sens")
@@ -512,7 +512,7 @@ test_perf2 = performance(perf_test_data, "sens","spec")
 test_perf2a = performance(perf_test_data, "tpr","fpr")
 test_aucpr = performance(perf_test_data, "aucpr")
 test_auc = performance(perf_test_data, "auc")
-
+test_aucpr@y.values[[1]]
 ```
 
 ```{r}
