@@ -472,6 +472,54 @@ test_auc = performance(perf_test_data, "auc")
 ```
 
 ```{r}
+library(xgboost)
+library(data.table)
+
+data_train <- setDT(data_train)
+data_test <- setDT(data_test)
+
+labels <- data_train$deferral
+ts_label <- data_test$deferral
+
+new_tr <- model.matrix(~.+0,data = data_train[,"meas1",with=F]) 
+new_ts <- model.matrix(~.+0,data = data_test[,"meas1",with=F])
+
+labels <- as.numeric(labels)-1
+ts_label <- as.numeric(ts_label)-1
+
+dtrain <- xgb.DMatrix(data = new_tr,label = labels) 
+dtest <- xgb.DMatrix(data = new_ts,label=ts_label)
+
+params <- list(booster = "gbtree", objective = "binary:logistic", eta=0.3, gamma=0, max_depth=6, min_child_weight=1, subsample=1, colsample_bytree=1)
+
+#xgbcv <- xgb.cv( params = params, data = dtrain, nrounds = 100, nfold = 5, showsd = T, stratified = T, print.every.n = 10, early.stop.round = 20, maximize = F)
+
+xgb1 <- xgb.train (params = params, data = dtrain, nrounds = 100, print_every_n = 10, watchlist = c(train=dtrain),early_stopping_rounds = 10, maximize = F , eval_metric = "error")
+
+xgbpred <- predict(xgb1,dtrain)
+perf_train_data = prediction(xgbpred, data_train$deferral)
+train_perf = performance(perf_train_data, "prec","sens")
+train_perf2 = performance(perf_train_data, "sens","spec")
+train_perf2a = performance(perf_train_data, "tpr","fpr")
+train_aucpr = performance(perf_train_data, "aucpr")
+train_auc = performance(perf_train_data, "auc")
+
+train_aucpr@y.values[[1]]
+
+xgbpred <- predict(xgb1,dtest)
+perf_test_data = prediction(xgbpred, data_test$deferral)
+test_perf = performance(perf_test_data, "prec","sens")
+test_perf2 = performance(perf_test_data, "sens","spec")
+test_perf2a = performance(perf_test_data, "tpr","fpr")
+test_aucpr = performance(perf_test_data, "aucpr")
+test_auc = performance(perf_test_data, "auc")
+
+test_aucpr@y.values[[1]]
+
+```
+
+
+```{r}
 #| label: fig-AUPRcurve
 #| fig-cap-location: margin
 #| fig-cap: Precision-recall curve of a Random Forrest deferral prediction model when applied to random training and test data sets with a 3% deferral rate.
