@@ -22,6 +22,8 @@ library(randomForest)
 library(ROCR)
 library(kableExtra)
 library(formatdown)
+library(xgboost)
+library(data.table)
 
 # Functions
 
@@ -110,12 +112,28 @@ createNewTestDataset<-function(){
 #| code-summary: "function: analyseTrainingData()"
 analyseTrainingData<-function(){
   # fit RF model
-  RFmodel <<- randomForest(deferral~meas1, data=data_train)
+  
+  data_train <- setDT(data_train)
+  labels <- data_train$deferral
+
+  new_tr <- model.matrix(~.+0,data = data_train[,"meas1",with=F]) 
+
+  labels <- as.numeric(labels)-1
+
+  dtrain <- xgb.DMatrix(data = new_tr,label = labels) 
+
+  params <- list(booster = "gbtree", objective = "binary:logistic", eta=0.3, gamma=0, max_depth=6, min_child_weight=1, subsample=1, colsample_bytree=1)
+
+#xgbcv <- xgb.cv( params = params, data = dtrain, nrounds = 100, nfold = 5, showsd = T, stratified = T, print.every.n = 10, early.stop.round = 20, maximize = F)
+
+  xgb1 <- xgb.train (params = params, data = dtrain, nrounds = 100, print_every_n = 10, watchlist = c(train=dtrain),early_stopping_rounds = 10, maximize = F , eval_metric = "error")
+
   # calculate AUPR
-  pred_train_p = predict(RFmodel, newdata = data_train, type = "prob")
-  perf_train_data = prediction(pred_train_p[,2], data_train$deferral)
+  xgbpred <- predict(xgb1,dtrain)
+  perf_train_data = prediction(xgbpred, data_train$deferral)
   train_aucpr = performance(perf_train_data, "aucpr")
   train_auc = performance(perf_train_data, "auc")
+  
   return(c(train_aucpr@y.values[[1]],train_auc@y.values[[1]]))
 }
 ```
@@ -125,9 +143,18 @@ analyseTrainingData<-function(){
 #| code-summary: "function: analyseTestData()"
 
 analyseTestData<-function(){
+  data_test <- setDT(data_test)
+
+  ts_label <- data_test$deferral
+
+  new_ts <- model.matrix(~.+0,data = data_test[,"meas1",with=F])
+
+  ts_label <- as.numeric(ts_label)-1
+
+  dtest <- xgb.DMatrix(data = new_ts,label=ts_label)
   # calculate AUPR
-  pred_test_p = predict(RFmodel, newdata = data_test, type= "prob")
-  perf_test_data = prediction(pred_test_p[,2], data_test$deferral)
+  xgbpred_test <- predict(xgb1,dtest)
+  perf_test_data = prediction(xgbpred_test, data_test$deferral)
   test_aucpr = performance(perf_test_data, "aucpr")
   test_auc = performance(perf_test_data, "auc")
   return(c(test_aucpr@y.values[[1]],test_auc@y.values[[1]]))
@@ -246,10 +273,10 @@ plotResultsorProportions <- function(res, auind, aucor, calcMedian, plotResults,
   if(plotResults){ #plotting results for own test data
     if(auind==1){
       if (aucor==T){ # corrected AUPR values
-        plot(c(props-d,props+d),c(auMean,diag(auMean1)), pch=rep(c(1,4),each=lp), ylim=c(0,.3),
+        plot(c(props-d,props+d),c(auMean,diag(auMean1)), pch=rep(c(1,4),each=lp), ylim=c(0,1),
              ylab="Corrected area under the PR curve", xlab="Proportion deferrals")
       } else { # corrected AUPR values
-        plot(c(props-d,props+d),c(auMean,diag(auMean1)), pch=rep(c(1,4),each=lp), ylim=c(0,.5),
+        plot(c(props-d,props+d),c(auMean,diag(auMean1)), pch=rep(c(1,4),each=lp), ylim=c(0,1),
              ylab="Area under the PR curve", xlab="Proportion deferrals")
       }
     } else {
@@ -268,16 +295,16 @@ plotResultsorProportions <- function(res, auind, aucor, calcMedian, plotResults,
     if (aucor==T){ # corrected AUPR values
       ylab="Corrected area under the PR curve"
       if(plotboth){
-        ylim<-c(0,0.45)
+        ylim<-c(0,1)
       } else { # if plotted with alternative deferral probability dataset
-        ylim<-c(0,0.3)
+        ylim<-c(0,1)
       }
     } else {
       ylab="Area under the PR curve"
       if(plotboth){
-        ylim<-c(0,0.65)
+        ylim<-c(0,1)
       } else { # if plotted with alternative deferral probability dataset
-        ylim<-c(0,0.5)
+        ylim<-c(0,1)
       }
     }
   } else { # AUROC plots
@@ -401,7 +428,7 @@ set.seed(3)
 #| results: false
 #| code-summary: "Code population simulation"
 
-(d1<-createDatasets(propdef=0.05, printresults = F))
+(d1<-createDatasets(propdef=0.03, printresults = F))
 
 p1<- pnorm(threshold, mean=PopMean, PopSd) # theoretical proportion of deferrals
 p2<- pnorm(threshold, mean=PopMean, sqrt(PopSd^2+MeasSds[1]^2))
@@ -441,40 +468,9 @@ We simulated a dataset of `r fix_decimals(n,digits=0, big_mark=",")` donations f
 #| label: fit model and calculate statistics
 #| echo: true
 #| results: false
-#| code-summary: "Code RF model"
+#| code-summary: "Code xgboost model"
 
 # Now fit a model
-bestmtry <- tuneRF(data_train,data_train$deferral,stepFactor=1.20, improve = 0.010, trace=T, plot= F) 
-RFmodel <- randomForest(deferral~meas1,data=data_train)
-```
-
-```{r}
-#| label: performance 
-#| code-summary: "Code performance statistics"
-
-# Calculate various prediction characteristics 
-pred_train_p = predict(RFmodel, type = "prob")
-pred_train_p = predict(RFmodel, newdata=data_train, type = "prob")
-perf_train_data = prediction(pred_train_p[,2], data_train$deferral)
-train_perf = performance(perf_train_data, "prec","sens")
-train_perf2 = performance(perf_train_data, "sens","spec")
-train_perf2a = performance(perf_train_data, "tpr","fpr")
-train_aucpr = performance(perf_train_data, "aucpr")
-train_auc = performance(perf_train_data, "auc")
-
-pred_test_p = predict(RFmodel, newdata = data_test, type= "prob")
-perf_test_data = prediction(pred_test_p[,2], data_test$deferral)
-test_perf = performance(perf_test_data, "prec","sens")
-test_perf2 = performance(perf_test_data, "sens","spec")
-test_perf2a = performance(perf_test_data, "tpr","fpr")
-test_aucpr = performance(perf_test_data, "aucpr")
-test_auc = performance(perf_test_data, "auc")
-```
-
-```{r}
-library(xgboost)
-library(data.table)
-
 data_train <- setDT(data_train)
 data_test <- setDT(data_test)
 
@@ -496,6 +492,13 @@ params <- list(booster = "gbtree", objective = "binary:logistic", eta=0.3, gamma
 
 xgb1 <- xgb.train (params = params, data = dtrain, nrounds = 100, print_every_n = 10, watchlist = c(train=dtrain),early_stopping_rounds = 10, maximize = F , eval_metric = "error")
 
+```
+
+```{r}
+#| label: performance 
+#| code-summary: "Code performance statistics"
+
+
 xgbpred <- predict(xgb1,dtrain)
 perf_train_data = prediction(xgbpred, data_train$deferral)
 train_perf = performance(perf_train_data, "prec","sens")
@@ -504,20 +507,15 @@ train_perf2a = performance(perf_train_data, "tpr","fpr")
 train_aucpr = performance(perf_train_data, "aucpr")
 train_auc = performance(perf_train_data, "auc")
 
-train_aucpr@y.values[[1]]
-
-xgbpred <- predict(xgb1,dtest)
-perf_test_data = prediction(xgbpred, data_test$deferral)
+xgbpred_test <- predict(xgb1,dtest)
+perf_test_data = prediction(xgbpred_test, data_test$deferral)
 test_perf = performance(perf_test_data, "prec","sens")
 test_perf2 = performance(perf_test_data, "sens","spec")
 test_perf2a = performance(perf_test_data, "tpr","fpr")
 test_aucpr = performance(perf_test_data, "aucpr")
 test_auc = performance(perf_test_data, "auc")
 
-test_aucpr@y.values[[1]]
-
 ```
-
 
 ```{r}
 #| label: fig-AUPRcurve
@@ -525,7 +523,7 @@ test_aucpr@y.values[[1]]
 #| fig-cap: Precision-recall curve of a Random Forrest deferral prediction model when applied to random training and test data sets with a 3% deferral rate.
 #| code-summary: "Code plot PR curves"
 
-plot(train_perf, main="Precision-recall curve for Random Forest",col=2,lwd=2, xlab="Recall")
+plot(train_perf, main="Precision-recall curve for XGBoost",col=2,lwd=2, xlab="Recall")
 lines(unlist(train_perf@x.values),unlist(train_perf@y.values), col=2, lwd=2)
 lines(unlist(test_perf@x.values),unlist(test_perf@y.values), col=3, lwd=2)
 legend("topright", c(paste0("Training data (AUPR=",round(train_aucpr@y.values[[1]],3),")"), paste0("Test data (AUPR=",round(test_aucpr@y.values[[1]],3),")")), col=c(2,3), lwd=c(2,2))
