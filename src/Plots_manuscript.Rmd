@@ -123,7 +123,7 @@ aupradjplot <- ggplot(dfadj, aes(x=value,
              color = modelcountry, size = pointsize)) +
   geom_point(position = position_dodge(width = 0.6), shape = 16)+
   geom_pointrange(position = position_dodge(width= 0.6), size = 0.35, fatten = 0.8) +
-  labs(title="Performance by validation dataset of models trained in different blood establishments",color = "Training data from") +
+  labs(title="Performance by validation dataset of models trained in \ndifferent blood establishments",color = "Training data from") +
   coord_cartesian(xlim=c(0, 1)) + 
   facet_grid(datacountry ~ sex, labeller = labeller(datacountry = datacountry.labs, sex = sex.labs)) + 
   xlab("AUPR adjusted for deferral rate") + 
@@ -156,7 +156,7 @@ auprplot<-  ggplot(df, aes(x=value,
              color = modelcountry, size=pointsize)) +
   geom_point(position = position_dodge(width = 0.6), shape = 16)+
   geom_pointrange(position = position_dodge(width= 0.6), size = 0.35, fatten = 0.8) +
-  labs(title="Performance by validation dataset of models trained in different blood establishments",
+  labs(title="Performance by validation dataset of models trained in \ndifferent blood establishments",
        color = "Training data from") +
   coord_cartesian(xlim=c(0, 1)) + 
   facet_grid(datacountry ~ sex, labeller = labeller(datacountry = datacountry.labs, sex = sex.labs)) + xlab("AUPR") + ylab("Training data from") + theme(legend.position = "none") + scale_y_discrete(limits = rev(levels(df$modelcountry)))+
@@ -199,7 +199,7 @@ aurocplot<-  ggplot(df, aes(x=value,
              color = modelcountry,size=pointsize)) +
   geom_point(position = position_dodge(width = 0.6), shape = 16)+
   geom_pointrange(position = position_dodge(width= 0.6), size = 0.35, fatten = 0.8) +
-  labs(title="Performance by validation dataset of models trained in different blood establishments",
+  labs(title="Performance by validation dataset of models trained in \ndifferent blood establishments",
        color = "Training data from") +
   coord_cartesian(xlim=c(0, 1)) + 
   facet_grid(datacountry ~ sex, labeller = labeller(datacountry = datacountry.labs, sex = sex.labs)) + xlab("AUROC") + ylab("Training data from") + theme(legend.position = "none") + scale_y_discrete(limits = rev(levels(df$modelcountry)))+

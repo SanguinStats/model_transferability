@@ -112,7 +112,7 @@ analyseTrainingData<-function(){
   # fit RF model
   RFmodel <<- randomForest(deferral~meas1, data=data_train)
   # calculate AUPR
-  pred_train_p = predict(RFmodel, type = "prob")
+  pred_train_p = predict(RFmodel, newdata = data_train, type = "prob")
   perf_train_data = prediction(pred_train_p[,2], data_train$deferral)
   train_aucpr = performance(perf_train_data, "aucpr")
   train_auc = performance(perf_train_data, "auc")
@@ -391,7 +391,7 @@ testprop <-0.20 # proportion test data
 nrsimulations <- 300
 
 # set seed value
-set.seed(1)
+set.seed(3)
 ```
 
 # Description of a hypothetical donor population
@@ -401,7 +401,7 @@ set.seed(1)
 #| results: false
 #| code-summary: "Code population simulation"
 
-(d1<-createDatasets(propdef=0.03, printresults = F))
+(d1<-createDatasets(propdef=0.05, printresults = F))
 
 p1<- pnorm(threshold, mean=PopMean, PopSd) # theoretical proportion of deferrals
 p2<- pnorm(threshold, mean=PopMean, sqrt(PopSd^2+MeasSds[1]^2))
@@ -454,6 +454,7 @@ RFmodel <- randomForest(deferral~meas1,data=data_train)
 
 # Calculate various prediction characteristics 
 pred_train_p = predict(RFmodel, type = "prob")
+pred_train_p = predict(RFmodel, newdata=data_train, type = "prob")
 perf_train_data = prediction(pred_train_p[,2], data_train$deferral)
 train_perf = performance(perf_train_data, "prec","sens")
 train_perf2 = performance(perf_train_data, "sens","spec")
