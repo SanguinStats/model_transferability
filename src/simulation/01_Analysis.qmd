@@ -11,7 +11,7 @@ format:
     embed-resources: true
 ---
 
-# R Initialization and defining general Functions
+# R Initialization and defining general functions
 
 ```{r warning=F, message=F}
 #| label: packages
@@ -539,7 +539,7 @@ lines(unlist(test_perf2a@x.values),unlist(test_perf2a@y.values), col=3, lwd=2)
 legend("bottomright", c(paste0("Training data (AUC=",round(train_auc@y.values[[1]],3),")"), paste0("Test data (AUC=",round(test_auc@y.values[[1]],3),")")), col=c(2,3), lwd=c(2,2))
 ```
 
-# Simulation with a replication of the RF fits
+# Simulation with a replication of the XGBoost fits
 
 We repeated the RF fitting procedure `r nrsimulations` times for various deferral rates (`r substr(paste(paste0(props*100,"%,"), collapse =" "), 1, nchar(paste(paste0(props*100,"%,"), collapse =" "))-1)`). The deferral rates in the training and test data are shown in @fig-defrates. Deferral rates were set by adjusting the population mean Hb level accordingly. @fig-AUPR and @fig-AUROC show the AUPRadj and AUROC estimates for RF models trained and tested at various deferral rates. These figures clearly show that both the AUPRadj and AUROC estimates increase with an increase in donor deferral rate. Also, these figures show that the AUPRadj is more sensitive to changes between the models tested at various deferral rates. This is because the AUPR is sensitive changes in the positive predictive value (or precision) of the model whereas the AUROC is not. This is the main reason that AUPR performance measures are recommended for evaluating models with unbalanced binary class outcomes @saito_precision-recall_2015. In @fig-AUPRexchange the AUPR estimates for RF models for various deferral rates are shown again, but now the results for models trained at all deferral rate levels applied to all deferral rate test data are shown as well. These results are provided in numerical form in @tbl-AUPRadj. @fig-AUROCexchange and @tbl-AUROC provide the same information for AUROC estimates. From @fig-AUPRexchange and @fig-AUROCexchange it can be found that models trained on data sets with higher deferral rates generally have a (slightly) better performance than model trained on dataset with lower deferral rates. @fig-AUPRbothmeaserr and @fig-AUROCbothmeaserr show the result of applying these models to test datasets with a lower measurement error (`r MeasSds[2]` instead of `r fix_decimals(MeasSds[1],2)` mmol/L) but identical preset deferral rates. These figures clearly show the increase in performance of the prediction models when measurements are more accurate. The data presented in these figures is also provided in @tbl-AUPRadj and @tbl-AUROC.
 
