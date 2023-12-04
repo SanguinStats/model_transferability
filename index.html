@@ -3267,11 +3267,11 @@ border: 0;
     <h2 id="toc-title">Table of contents</h2>
    
   <ul>
-  <li><a href="#r-initialization-and-defining-general-functions" id="toc-r-initialization-and-defining-general-functions" class="nav-link active" data-scroll-target="#r-initialization-and-defining-general-functions">R Initialization and defining general Functions</a></li>
+  <li><a href="#r-initialization-and-defining-general-functions" id="toc-r-initialization-and-defining-general-functions" class="nav-link active" data-scroll-target="#r-initialization-and-defining-general-functions">R Initialization and defining general functions</a></li>
   <li><a href="#setting-various-simulation-parameters" id="toc-setting-various-simulation-parameters" class="nav-link" data-scroll-target="#setting-various-simulation-parameters">Setting various simulation parameters</a></li>
   <li><a href="#description-of-a-hypothetical-donor-population" id="toc-description-of-a-hypothetical-donor-population" class="nav-link" data-scroll-target="#description-of-a-hypothetical-donor-population">Description of a hypothetical donor population</a></li>
   <li><a href="#using-a-xgboost-model-to-predict-donor-deferral" id="toc-using-a-xgboost-model-to-predict-donor-deferral" class="nav-link" data-scroll-target="#using-a-xgboost-model-to-predict-donor-deferral">Using a XGBoost model to predict donor deferral</a></li>
-  <li><a href="#simulation-with-a-replication-of-the-rf-fits" id="toc-simulation-with-a-replication-of-the-rf-fits" class="nav-link" data-scroll-target="#simulation-with-a-replication-of-the-rf-fits">Simulation with a replication of the RF fits</a>
+  <li><a href="#simulation-with-a-replication-of-the-xgboost-fits" id="toc-simulation-with-a-replication-of-the-xgboost-fits" class="nav-link" data-scroll-target="#simulation-with-a-replication-of-the-xgboost-fits">Simulation with a replication of the XGBoost fits</a>
   <ul class="collapse">
   <li><a href="#aupradj-results" id="toc-aupradj-results" class="nav-link" data-scroll-target="#aupradj-results">AUPRadj Results</a></li>
   <li><a href="#auroc-results" id="toc-auroc-results" class="nav-link" data-scroll-target="#auroc-results">AUROC Results</a></li>
@@ -3305,7 +3305,7 @@ border: 0;
 </header>
 
 <section id="r-initialization-and-defining-general-functions" class="level1">
-<h1>R Initialization and defining general Functions</h1>
+<h1>R Initialization and defining general functions</h1>
 <div class="cell">
 <details>
 <summary>Loading libraries</summary>
@@ -3833,8 +3833,8 @@ With a deferral threshold of 8.4 this population should have 1.0% of its donors 
 </div>
 </div>
 </section>
-<section id="simulation-with-a-replication-of-the-rf-fits" class="level1 page-columns page-full">
-<h1>Simulation with a replication of the RF fits</h1>
+<section id="simulation-with-a-replication-of-the-xgboost-fits" class="level1 page-columns page-full">
+<h1>Simulation with a replication of the XGBoost fits</h1>
 <p>We repeated the RF fitting procedure 300 times for various deferral rates (1%, 2%, 4%, 8%, 16%). The deferral rates in the training and test data are shown in <a href="#fig-defrates">Figure 4</a>. Deferral rates were set by adjusting the population mean Hb level accordingly. <a href="#fig-AUPR">Figure 5</a> and <a href="#fig-AUROC">Figure 8</a> show the AUPRadj and AUROC estimates for RF models trained and tested at various deferral rates. These figures clearly show that both the AUPRadj and AUROC estimates increase with an increase in donor deferral rate. Also, these figures show that the AUPRadj is more sensitive to changes between the models tested at various deferral rates. This is because the AUPR is sensitive changes in the positive predictive value (or precision) of the model whereas the AUROC is not. This is the main reason that AUPR performance measures are recommended for evaluating models with unbalanced binary class outcomes <span class="citation" data-cites="saito_precision-recall_2015">[<a href="#ref-saito_precision-recall_2015" role="doc-biblioref">2</a>]</span>. In <a href="#fig-AUPRexchange">Figure 6</a> the AUPR estimates for RF models for various deferral rates are shown again, but now the results for models trained at all deferral rate levels applied to all deferral rate test data are shown as well. These results are provided in numerical form in <a href="#tbl-AUPRadj">Table 1</a>. <a href="#fig-AUROCexchange">Figure 9</a> and <a href="#tbl-AUROC">Table 2</a> provide the same information for AUROC estimates. From <a href="#fig-AUPRexchange">Figure 6</a> and <a href="#fig-AUROCexchange">Figure 9</a> it can be found that models trained on data sets with higher deferral rates generally have a (slightly) better performance than model trained on dataset with lower deferral rates. <a href="#fig-AUPRbothmeaserr">Figure 7</a> and <a href="#fig-AUROCbothmeaserr">Figure 10</a> show the result of applying these models to test datasets with a lower measurement error (0.25 instead of 0.50 mmol/L) but identical preset deferral rates. These figures clearly show the increase in performance of the prediction models when measurements are more accurate. The data presented in these figures is also provided in <a href="#tbl-AUPRadj">Table 1</a> and <a href="#tbl-AUROC">Table 2</a>.</p>
 <div class="cell">
 <details>
