@@ -11,7 +11,7 @@ format:
     embed-resources: true
 ---
 
-An interactive version of this supplement is available through: <https://sanguinstats.github.io/model_transferability/>
+An interactive version of this supplement is available through: <https://sanguinstats.github.io/model_transferability/>. 
 
 # R Initialization and defining general functions
 
