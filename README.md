@@ -8,7 +8,7 @@ In this repository, you will find the scripts used to produce the results and fi
 
 In the [source](/src) folder, scripts for producing the results and figures can be found. The script for the manuscript figures specifically can be found [here](/src/Plots_manuscript.Rmd). 
 
-In the [figures](/figures) folder, the figures produced in this project can be found. There is a specific folder for the figures in the manuscript, where you can find [Figure 1](figures/Manuscript_plots/AUPRadj_forestplot.png) and [Figure 2](figures/Manuscript_plots/SHAP.png). 
+In the [figures](/figures) folder, the figures produced in this project can be found. There is a specific folder for the [figures in the manuscript](/figures/Manuscript_plots/), where you can find [Figure 1](figures/Manuscript_plots/AUPRadj_forestplot.png) and [Figure 2](figures/Manuscript_plots/SHAP.png). 
 
 We conducted a simulation that is included in the supplemental materials of the paper. The files for the simulation are also located in the [simulation](/simulation) folder, for example the [Quarto file](/simulation/01_Analysis.qmd) of the simulation. The results can be viewed [here](https://sanguinstats.github.io/model_transferability/)
 
