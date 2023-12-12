@@ -1,5 +1,5 @@
 ---
-title: "Supplementary materials to the paper “Random Forest Haemoglobin Deferral Prediction Models: Can we use the same prediction model across countries?”"
+title: "Supplementary materials to the paper “Predicting haemoglobin deferral using machine learning models: can we use the same prediction model across countries?”"
 authors: Amber Meulenbeld, Jarkko Toivonen, Tinus Brits, Ronel Swanevelder, Dorien de Clippel, Veerle Compernolle, Surendra Karki, Marijke Welvaert, Katja van den Hurk, Joost van Rosmalen, Emmanuel Lesaffre, Mart Janssen and Mikko Arvas
 bibliography: bibliography.bib
 csl: vox-sanguinis.csl
@@ -10,6 +10,8 @@ format:
     toc: true
     embed-resources: true
 ---
+
+An interactive version of this supplement is available through: <https://sanguinstats.github.io/model_transferability/>
 
 # R Initialization and defining general functions
 
