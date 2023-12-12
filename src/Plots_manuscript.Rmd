@@ -370,5 +370,5 @@ names(datacountry.labs) <- c("Netherlands","Finland","South Africa (Own cut off)
       labs(color = "Training data from", shape = "Training data from") + theme(axis.text.x=element_text(size=8))
 plt <- annotate_figure(plt, right = text_grob("Validation data from", rot = -90, size = 10, x = -9.75, vjust=1))
 
-ggsave(plt, file = paste0(FolderName, "/SHAP.jpg"), height = 13, width = 13)
+ggsave(plt, file = paste0(FolderName, "/SHAP.png"), height = 15, width = 13)
 ```
