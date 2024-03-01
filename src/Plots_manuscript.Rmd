@@ -352,6 +352,16 @@ data_maa <- data_shap %>%
   group_by(variable) %>%
   mutate(avg_avg_maa = mean(maa)) %>%
   ungroup()
+
+top_5_variables_M <- data_maa %>% filter(sex=="male")  %>%
+  group_by(datacountry, modelcountry) %>%
+  top_n(6, avg_maa) %>%
+  ungroup()
+
+top_5_variables_F <- top_5_variables_M %>% select (-maa, -avg_maa, -avg_avg_maa, - sex) %>% mutate(sex = "female")
+top_5_variables_F <- merge(top_5_variables_F, data_maa, by = c("datacountry", "model", "modelcountry", "sex", "variable"))
+
+top_variables <- rbind(top_5_variables_F, top_5_variables_M)
 ```
 
 ## SHAP plot
@@ -361,7 +371,12 @@ data_maa <- data_shap %>%
 datacountry.labs <- c("The Netherlands","Finland","South Africa\n (Own cut off)", "South Africa\n (EU cut off)","Australia\n (Own cut off)", "Australia\n (EU cut off)", "Belgium")
 names(datacountry.labs) <- c("Netherlands","Finland","South Africa (Own cut off)", "South Africa (EU cut off)","Australia (Own cut off)", "Australia (EU cut off)", "Belgium")
 
-  plt <- ggplot(data=data_maa, aes(x = reorder(variable, avg_maa))) +facet_grid(datacountry ~ sex, labeller = labeller(datacountry = datacountry.labs, sex = sex.labs))+
+
+sex.labs <- c("Male", "Female")
+names(sex.labs) <- c("male", "female")
+
+
+  plt <- ggplot(data=top_variables, aes(x = reorder(variable, avg_maa))) +facet_grid(datacountry ~ sex, labeller = labeller(datacountry = datacountry.labs, sex = sex.labs), scales = "free_y")+
       geom_line(mapping=aes(y = maa, group = modelcountry, color = modelcountry), linewidth = 1) +
       geom_point(mapping=aes(y = maa, color = modelcountry, shape = modelcountry), size = 2) +
       geom_col(mapping=aes(y = avg_maa), alpha = 0.1, position = 'identity') +
@@ -371,4 +386,28 @@ names(datacountry.labs) <- c("Netherlands","Finland","South Africa (Own cut off)
 plt <- annotate_figure(plt, right = text_grob("Validation data from", rot = -90, size = 10, x = -9.75, vjust=1))
 
 ggsave(plt, file = paste0(FolderName, "/SHAP.png"), height = 15, width = 13)
+```
+
+## SHAP plot supplementary material (all variables)
+
+```{r SHAP plots}
+
+datacountry.labs <- c("The Netherlands","Finland","South Africa\n (Own cut off)", "South Africa\n (EU cut off)","Australia\n (Own cut off)", "Australia\n (EU cut off)", "Belgium")
+names(datacountry.labs) <- c("Netherlands","Finland","South Africa (Own cut off)", "South Africa (EU cut off)","Australia (Own cut off)", "Australia (EU cut off)", "Belgium")
+
+
+sex.labs <- c("Male", "Female")
+names(sex.labs) <- c("male", "female")
+
+
+  plt <- ggplot(data=data_maa, aes(x = reorder(variable, avg_maa))) +facet_grid(datacountry ~ sex, labeller = labeller(datacountry = datacountry.labs, sex = sex.labs), scales = "free_y")+
+      geom_line(mapping=aes(y = maa, group = modelcountry, color = modelcountry), linewidth = 1) +
+      geom_point(mapping=aes(y = maa, color = modelcountry, shape = modelcountry), size = 2) +
+      geom_col(mapping=aes(y = avg_maa), alpha = 0.1, position = 'identity') +
+      scale_shape_manual(values=c(18, 15, 8, 17, 16, 6, 13)) +
+      coord_flip() + xlab("Variable") + ylab("Mean absolute attribution")+ theme_bw()+ ggtitle("Variable importance in models by validation dataset")+
+      labs(color = "Training data from", shape = "Training data from") + theme(axis.text.x=element_text(size=8))
+plt <- annotate_figure(plt, right = text_grob("Validation data from", rot = -90, size = 10, x = -9.75, vjust=1))
+
+ggsave(plt, file = paste0(FolderName, "/SHAP2.png"), height = 15, width = 13)
 ```
