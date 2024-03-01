@@ -13,6 +13,8 @@ format:
 
 An interactive version of this supplement is available through: <https://sanguinstats.github.io/model_transferability/>. 
 
+In the interactive version, codeblocks can be expanded to read about and view the functionality of the functions.
+
 # R Initialization and defining general functions
 
 ```{r warning=F, message=F}
